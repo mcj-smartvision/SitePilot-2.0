@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,39 +9,37 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-export default function LoginPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/reports'
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+    setMessage(null)
     setError(null)
 
     const supabase = createClient()
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
 
-    if (signInError) {
-      setError(signInError.message)
-      setLoading(false)
-      return
+    if (resetError) {
+      setError(resetError.message)
+    } else {
+      setMessage('If this email exists, a password reset link has been sent.')
     }
-
-    router.push(redirect)
-    router.refresh()
+    setLoading(false)
   }
 
   return (
     <main className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Sign in to SitePilot</CardTitle>
-          <CardDescription>Use the email and password provided by your admin.</CardDescription>
+          <CardTitle>Forgot password</CardTitle>
+          <CardDescription>Enter your email to receive a reset link.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -50,28 +47,23 @@ export default function LoginPage() {
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            {error && (
+            {message ? (
+              <Alert>
+                <AlertDescription>{message}</AlertDescription>
+              </Alert>
+            ) : null}
+            {error ? (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
-            )}
+            ) : null}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? 'Sending...' : 'Send reset link'}
             </Button>
           </form>
           <p className="text-sm text-muted-foreground mt-4 text-center">
-            <Link href="/forgot-password" className="text-primary underline">
-              Forgot password?
+            <Link href="/login" className="text-primary underline">
+              Back to sign in
             </Link>
           </p>
         </CardContent>

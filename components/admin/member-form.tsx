@@ -13,15 +13,23 @@ interface MemberFormProps {
   positions: Position[]
   initial?: Partial<ProjectMember> & { position_ids?: string[] }
   submitLabel: string
-  onSubmit: (values: CreateMemberInput & { send_invite?: boolean }) => Promise<void>
+  onSubmit: (values: CreateMemberInput) => Promise<void>
+  showPasswordField?: boolean
 }
 
-export function MemberForm({ positions, initial, submitLabel, onSubmit }: MemberFormProps) {
+export function MemberForm({
+  positions,
+  initial,
+  submitLabel,
+  onSubmit,
+  showPasswordField = !initial,
+}: MemberFormProps) {
+  const activePositions = positions.filter((p) => p.is_active)
   const [fullName, setFullName] = useState(initial?.full_name ?? '')
   const [email, setEmail] = useState(initial?.email ?? '')
   const [phone, setPhone] = useState(initial?.phone ?? '')
+  const [password, setPassword] = useState('')
   const [isActive, setIsActive] = useState(initial?.is_active ?? true)
-  const [sendInvite, setSendInvite] = useState(!initial)
   const [positionIds, setPositionIds] = useState<string[]>(
     initial?.position_ids ?? initial?.positions?.map((p) => p.id) ?? []
   )
@@ -30,16 +38,27 @@ export function MemberForm({ positions, initial, submitLabel, onSubmit }: Member
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
     setError(null)
+
+    if (positionIds.length < 1) {
+      setError('Select at least one position.')
+      return
+    }
+
+    if (showPasswordField && password.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+
+    setLoading(true)
     try {
       await onSubmit({
         full_name: fullName.trim(),
         email: email.trim(),
         phone: phone.trim() || undefined,
+        password: showPasswordField ? password : (initial?.admin_visible_password ?? ''),
         is_active: isActive,
         position_ids: positionIds,
-        send_invite: sendInvite,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save member')
@@ -61,31 +80,59 @@ export function MemberForm({ positions, initial, submitLabel, onSubmit }: Member
               <Input id="member-name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="member-email">Email</Label>
-              <Input id="member-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Label htmlFor="member-email">Email (login username)</Label>
+              <Input
+                id="member-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={Boolean(initial)}
+              />
             </div>
           </div>
+          {showPasswordField ? (
+            <div className="space-y-2">
+              <Label htmlFor="member-password">Password</Label>
+              <Input
+                id="member-password"
+                type="text"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                placeholder="Set login password for this member"
+              />
+              <p className="text-xs text-muted-foreground">
+                Admin can view this password. Member can change it later in Settings.
+              </p>
+            </div>
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="member-phone">Phone</Label>
             <Input id="member-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Positions</Label>
-            <PositionMultiSelect positions={positions.filter((p) => p.is_active)} selectedIds={positionIds} onChange={setPositionIds} />
+            <p className="text-xs text-muted-foreground">
+              Select one or more positions. Minimum 1, maximum all available positions.
+            </p>
+            <PositionMultiSelect
+              positions={activePositions}
+              selectedIds={positionIds}
+              onChange={setPositionIds}
+            />
           </div>
-          <div className="flex flex-col gap-2">
-            <Checkbox id="member-active" label="Active member" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-            {!initial ? (
-              <Checkbox
-                id="member-invite"
-                label="Send invite email if account does not exist"
-                checked={sendInvite}
-                onChange={(e) => setSendInvite(e.target.checked)}
-              />
-            ) : null}
-          </div>
+          <Checkbox
+            id="member-active"
+            label="Active member"
+            checked={isActive}
+            onChange={(e) => setIsActive(e.target.checked)}
+          />
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <Button type="submit" disabled={loading}>{loading ? 'Saving...' : submitLabel}</Button>
+          <Button type="submit" disabled={loading || activePositions.length === 0}>
+            {loading ? 'Saving...' : submitLabel}
+          </Button>
         </form>
       </CardContent>
     </Card>

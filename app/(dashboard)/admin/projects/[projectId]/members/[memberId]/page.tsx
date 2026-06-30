@@ -7,8 +7,9 @@ import { useSupabase } from '@/hooks/useSupabase'
 import { fetchPositions, fetchProjectMember, updateProjectMember } from '@/utils/admin'
 import { PageHeader, LoadingBlock, ErrorBlock } from '@/components/admin/shared'
 import { MemberForm } from '@/components/admin/member-form'
+import { AdminPasswordPanel } from '@/components/admin/admin-password-panel'
 import { Button } from '@/components/ui/button'
-import type { Position, ProjectMember } from '@/types/admin'
+import type { CreateMemberInput, Position, ProjectMember } from '@/types/admin'
 
 export default function MemberProfilePage({
   params,
@@ -23,23 +24,22 @@ export default function MemberProfilePage({
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
+  async function loadMember() {
+    const [memberData, positionData] = await Promise.all([
+      fetchProjectMember(supabase, params.memberId),
+      fetchPositions(supabase, params.projectId),
+    ])
+    if (!memberData) throw new Error('Member not found')
+    setMember(memberData)
+    setPositions(positionData)
+  }
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
         setLoading(true)
-        const [memberData, positionData] = await Promise.all([
-          fetchProjectMember(supabase, params.memberId),
-          fetchPositions(supabase, params.projectId),
-        ])
-        if (!cancelled) {
-          if (!memberData) {
-            setError('Member not found')
-            return
-          }
-          setMember(memberData)
-          setPositions(positionData)
-        }
+        await loadMember()
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load member profile')
       } finally {
@@ -58,7 +58,7 @@ export default function MemberProfilePage({
     <div className="space-y-6">
       <PageHeader
         title="Member Profile"
-        description="Update member details, email, phone, active status, and position assignments."
+        description="Update member details, positions, and login credentials."
         actions={
           <Button asChild variant="outline">
             <Link href={`/admin/projects/${params.projectId}/members`}>Back to members</Link>
@@ -72,6 +72,20 @@ export default function MemberProfilePage({
         </p>
       ) : null}
 
+      <AdminPasswordPanel
+        member={member}
+        onReset={async (password) => {
+          const response = await fetch('/api/admin/reset-member-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ member_id: member.id, password }),
+          })
+          const data = await response.json()
+          if (!response.ok) throw new Error(data.error || 'Failed to reset password')
+          await loadMember()
+        }}
+      />
+
       <MemberForm
         positions={positions}
         initial={{
@@ -79,15 +93,16 @@ export default function MemberProfilePage({
           position_ids: member.positions?.map((position) => position.id) ?? [],
         }}
         submitLabel="Save changes"
-        onSubmit={async (values) => {
+        showPasswordField={false}
+        onSubmit={async (values: CreateMemberInput) => {
           await updateProjectMember(supabase, member.id, {
             full_name: values.full_name,
-            email: values.email,
             phone: values.phone,
             is_active: values.is_active,
             position_ids: values.position_ids,
           })
           setSaved(true)
+          await loadMember()
           router.refresh()
         }}
       />

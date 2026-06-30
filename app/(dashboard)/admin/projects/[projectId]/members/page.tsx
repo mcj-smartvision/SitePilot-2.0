@@ -97,6 +97,11 @@ export default function ProjectMembersPage({ params }: { params: { projectId: st
                       <StatusBadge active={member.is_active} />
                     </div>
                     <p className="text-sm text-muted-foreground">{member.email}</p>
+                    <p className="text-sm">
+                      <span className="font-medium">Password:</span>{' '}
+                      {member.admin_visible_password || '—'}
+                      {member.password_changed_by_member ? ' (changed by member)' : ''}
+                    </p>
                     {member.phone ? <p className="text-sm text-muted-foreground">{member.phone}</p> : null}
                   </div>
                   <Button asChild variant="outline" size="sm">

@@ -33,6 +33,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 Admin
               </Link>
             ) : null}
+            <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground whitespace-nowrap">
+              Settings
+            </Link>
           </nav>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:inline">{user.email}</span>

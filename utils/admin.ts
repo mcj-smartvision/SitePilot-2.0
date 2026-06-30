@@ -15,6 +15,7 @@ import type {
   UpdateMemberInput,
   WidgetVisibilityInput,
 } from '@/types/admin'
+import { DEFAULT_SITE_POSITIONS } from '@/lib/admin/defaults'
 
 export async function fetchAdminStats(supabase: SupabaseClient): Promise<AdminStats> {
   const [projects, members, positions, routes] = await Promise.all([
@@ -67,7 +68,26 @@ export async function createProject(
     .single()
 
   if (error) throw new Error(error.message)
+
+  await seedDefaultPositions(supabase, data.id)
+
   return data as AdminProject
+}
+
+async function seedDefaultPositions(supabase: SupabaseClient, projectId: string) {
+  const { error } = await supabase.from('positions').insert(
+    DEFAULT_SITE_POSITIONS.map((position) => ({
+      project_id: projectId,
+      title: position.title,
+      key: position.key,
+      description: position.description,
+      is_active: true,
+    }))
+  )
+
+  if (error && !error.message.includes('duplicate')) {
+    throw new Error(error.message)
+  }
 }
 
 export async function updateProject(
@@ -202,6 +222,8 @@ export async function createProjectMember(
       full_name: input.full_name.trim(),
       phone: input.phone || null,
       is_active: input.is_active ?? true,
+      admin_visible_password: input.password,
+      password_changed_by_member: false,
       invited_at: new Date().toISOString(),
       joined_at: new Date().toISOString(),
     })
@@ -228,6 +250,10 @@ export async function updateProjectMember(
   if (input.email !== undefined) payload.email = input.email.trim().toLowerCase()
   if (input.phone !== undefined) payload.phone = input.phone || null
   if (input.is_active !== undefined) payload.is_active = input.is_active
+  if (input.password) {
+    payload.admin_visible_password = input.password
+    payload.password_changed_by_member = false
+  }
 
   if (Object.keys(payload).length > 0) {
     const { error } = await supabase.from('project_members').update(payload).eq('id', memberId)

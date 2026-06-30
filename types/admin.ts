@@ -41,6 +41,8 @@ export interface ProjectMember {
   is_active: boolean
   invited_at?: string | null
   joined_at?: string | null
+  admin_visible_password?: string | null
+  password_changed_by_member?: boolean
   created_at: string
   updated_at: string
   positions?: MemberPositionSummary[]
@@ -141,6 +143,7 @@ export interface CreateMemberInput {
   full_name: string
   email: string
   phone?: string
+  password: string
   is_active?: boolean
   position_ids: string[]
 }
@@ -151,6 +154,7 @@ export interface UpdateMemberInput {
   phone?: string
   is_active?: boolean
   position_ids?: string[]
+  password?: string
 }
 
 export interface NotificationRouteInput {

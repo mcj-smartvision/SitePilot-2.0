@@ -21,46 +21,71 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { project_id, full_name, email, phone, is_active, position_ids, send_invite } = body
+    const { project_id, full_name, email, phone, password, is_active, position_ids } = body
 
-    if (!project_id || !full_name || !email) {
-      return NextResponse.json({ error: 'project_id, full_name, and email are required' }, { status: 400 })
+    if (!project_id || !full_name || !email || !password) {
+      return NextResponse.json(
+        { error: 'project_id, full_name, email, and password are required' },
+        { status: 400 }
+      )
+    }
+
+    if (!Array.isArray(position_ids) || position_ids.length < 1) {
+      return NextResponse.json(
+        { error: 'Select at least one position for this member' },
+        { status: 400 }
+      )
+    }
+
+    if (String(password).length < 6) {
+      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 })
     }
 
     const normalizedEmail = String(email).trim().toLowerCase()
+    const service = createServiceClient()
     let profile = await findProfileByEmail(supabase, normalizedEmail)
 
-    if (!profile && send_invite) {
-      const service = createServiceClient()
-      const { data: invited, error: inviteError } = await service.auth.admin.inviteUserByEmail(
-        normalizedEmail,
-        {
-          data: { full_name },
-          redirectTo: `${request.nextUrl.origin}/login`,
-        }
-      )
+    if (profile) {
+      const { error: updateError } = await service.auth.admin.updateUserById(profile.id, {
+        password: String(password),
+        user_metadata: { full_name },
+        email_confirm: true,
+      })
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 400 })
+      }
+    } else {
+      const { data: created, error: createError } = await service.auth.admin.createUser({
+        email: normalizedEmail,
+        password: String(password),
+        email_confirm: true,
+        user_metadata: { full_name },
+      })
 
-      if (inviteError) {
-        return NextResponse.json({ error: inviteError.message }, { status: 400 })
+      if (createError) {
+        return NextResponse.json({ error: createError.message }, { status: 400 })
       }
 
-      if (invited.user) {
-        profile = {
-          id: invited.user.id,
-          email: invited.user.email ?? normalizedEmail,
-          full_name,
-        }
+      if (!created.user) {
+        return NextResponse.json({ error: 'Failed to create auth user' }, { status: 500 })
+      }
+
+      profile = {
+        id: created.user.id,
+        email: created.user.email ?? normalizedEmail,
+        full_name,
       }
     }
 
-    if (!profile) {
-      return NextResponse.json(
-        {
-          error:
-            'No user account exists for this email. Enable "Send invite email" or ask the member to sign up first.',
-        },
-        { status: 400 }
-      )
+    const { data: existingMember } = await supabase
+      .from('project_members')
+      .select('id')
+      .eq('project_id', project_id)
+      .eq('user_id', profile.id)
+      .maybeSingle()
+
+    if (existingMember) {
+      return NextResponse.json({ error: 'This member is already assigned to this project' }, { status: 400 })
     }
 
     const member = await createProjectMember(
@@ -71,15 +96,16 @@ export async function POST(request: NextRequest) {
         full_name,
         email: normalizedEmail,
         phone,
+        password: String(password),
         is_active: is_active ?? true,
-        position_ids: position_ids ?? [],
+        position_ids,
       },
       user.id
     )
 
     return NextResponse.json({ member }, { status: 201 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Invite failed'
+    const message = error instanceof Error ? error.message : 'Create member failed'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
