@@ -22,12 +22,11 @@ export function createCustomStandardId(): string {
 }
 
 export function customEntryToStandard(entry: CustomStandardEntry): ComplianceStandard {
-  const category = entry.category ?? 'general'
   return {
     key: customStandardKey(entry.id),
     code: entry.code.trim(),
     name: entry.name.trim(),
-    category,
+    category: normalizeCategory(entry.category),
     family: 'Custom',
     aiReferenceId: `custom:${entry.id}`,
     description: entry.description?.trim() || undefined,

@@ -31,9 +31,10 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
   mapsLoaderPromise = new Promise((resolve, reject) => {
     const callbackName = '__sitepilotMapsInit'
     const existing = document.querySelector<HTMLScriptElement>('script[data-google-maps="true"]')
+    const win = window as unknown as Record<string, unknown>
 
-    ;(window as Window & Record<string, unknown>)[callbackName] = () => {
-      delete (window as Record<string, unknown>)[callbackName]
+    win[callbackName] = () => {
+      delete win[callbackName]
       resolve()
     }
 
@@ -133,7 +134,7 @@ export function SiteLocationPicker({ className }: { className?: string }) {
 
   const updateOsmMarker = useCallback((lat: number, lng: number) => {
     if (!osmMapRef.current) return
-    const L = (window as Window & { L: { marker: (ll: [number, number], o?: { draggable?: boolean }) => LeafletMarker } }).L
+    const L = (window as unknown as { L: { marker: (ll: [number, number], o?: { draggable?: boolean }) => LeafletMarker } }).L
     if (osmMarkerRef.current) osmMarkerRef.current.setLatLng([lat, lng])
     else {
       osmMarkerRef.current = L.marker([lat, lng], { draggable: true }).addTo(osmMapRef.current)
@@ -239,13 +240,15 @@ export function SiteLocationPicker({ className }: { className?: string }) {
     if (!mapsReady || !mapContainerRef.current || mapInitializedRef.current) return
 
     const coords = parseLatLng(latitude, longitude)
-    const center = coords ?? getCountryMapCenter(country)
+    const countryCenter = getCountryMapCenter(country)
+    const mapCenter = coords ?? countryCenter
+    const mapZoom = coords ? 16 : countryCenter.zoom
 
     if (mapProvider === 'google') {
       mapInitializedRef.current = true
       const map = new google.maps.Map(mapContainerRef.current, {
-        center: { lat: center.lat, lng: center.lng },
-        zoom: coords ? 16 : center.zoom,
+        center: { lat: mapCenter.lat, lng: mapCenter.lng },
+        zoom: mapZoom,
         mapTypeControl: true,
         streetViewControl: false,
         fullscreenControl: true,
@@ -271,15 +274,15 @@ export function SiteLocationPicker({ className }: { className?: string }) {
 
       setTimeout(() => {
         google.maps.event.trigger(map, 'resize')
-        map.setCenter({ lat: center.lat, lng: center.lng })
+        map.setCenter({ lat: mapCenter.lat, lng: mapCenter.lng })
       }, 200)
       return
     }
 
     if (mapProvider === 'osm') {
       mapInitializedRef.current = true
-      const L = (window as Window & { L: LeafletModule }).L
-      const map = L.map(mapContainerRef.current).setView([center.lat, center.lng], coords ? 16 : center.zoom)
+      const L = (window as unknown as { L: LeafletModule }).L
+      const map = L.map(mapContainerRef.current).setView([mapCenter.lat, mapCenter.lng], mapZoom)
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap',
         maxZoom: 19,
