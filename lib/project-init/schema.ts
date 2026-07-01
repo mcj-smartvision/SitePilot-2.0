@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { resolveComplianceProfile } from '@/lib/compliance/engine'
+import type { CustomStandardEntry } from '@/lib/compliance/types'
 
 const optionalString = z.string().optional().or(z.literal(''))
 const optionalNumber = z.coerce.number().optional().or(z.nan()).transform((v) => (Number.isNaN(v) ? undefined : v))
@@ -103,6 +104,29 @@ export const customStandardEntrySchema = z.object({
   category: optionalString,
 })
 
+export type CustomStandardFormEntry = z.output<typeof customStandardEntrySchema>
+
+function toCustomStandardEntries(
+  entries:
+    | ReadonlyArray<{
+        id?: string
+        code?: string
+        name?: string
+        description?: string
+        category?: string
+      }>
+    | undefined
+): CustomStandardEntry[] {
+  if (!entries?.length) return []
+  return entries.map((entry) => ({
+    id: entry.id ?? '',
+    code: entry.code ?? '',
+    name: entry.name ?? '',
+    description: entry.description || undefined,
+    category: entry.category || undefined,
+  }))
+}
+
 /** Section 5 — Construction Compliance & Location */
 export const standardsLocationSchema = z.object({
   region: z.string().min(1, 'validation.regionRequired'),
@@ -172,7 +196,7 @@ export const projectInitializationSchema = projectInfoSchema
     path: [...scheduleDateRefine.path],
   })
 
-export type ProjectInitializationFormValues = z.infer<typeof projectInitializationSchema>
+export type ProjectInitializationFormValues = z.output<typeof projectInitializationSchema>
 
 export const STEP_SCHEMAS = [
   projectInfoSchema,
@@ -316,7 +340,7 @@ export function buildSubmissionPayload(values: ProjectInitializationFormValues):
     regulatoryRegion: values.regulatoryRegion,
     constructionType: values.constructionType,
     selectedStandards: values.selectedStandards ?? [],
-    customStandards: values.customStandards ?? [],
+    customStandards: toCustomStandardEntries(values.customStandards),
     additionalStandards: values.additionalStandards ?? [],
     customRegulatoryNote: values.customRegulatoryNote,
     customStandardNote: values.customStandardNote,
@@ -408,7 +432,7 @@ export function buildSubmissionPayload(values: ProjectInitializationFormValues):
       regulatoryRegion: values.regulatoryRegion,
       constructionType: values.constructionType,
       selectedStandards: values.selectedStandards ?? [],
-      customStandards: values.customStandards ?? [],
+      customStandards: toCustomStandardEntries(values.customStandards),
       additionalStandards: values.additionalStandards ?? [],
       customRegulatoryNote: values.customRegulatoryNote || null,
       customStandardNote: values.customStandardNote || null,
