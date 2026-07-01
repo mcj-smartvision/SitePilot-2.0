@@ -46,6 +46,15 @@ export interface ComplianceStandard {
   description?: string
 }
 
+/** User-defined standard entry from the project initialization form */
+export interface CustomStandardEntry {
+  id: string
+  code: string
+  name: string
+  description?: string
+  category?: ComplianceStandardCategory | string
+}
+
 export interface ComplianceResolutionInput {
   regulatoryRegion: RegulatoryRegionKey | string
   constructionType: ConstructionTypeKey | string
