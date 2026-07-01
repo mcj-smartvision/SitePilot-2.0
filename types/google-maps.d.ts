@@ -88,8 +88,8 @@ declare namespace google {
   const maps: typeof google.maps
 }
 
-interface Window {
-  google?: typeof google
+declare global {
+  interface Window {
+    google?: typeof google
+  }
 }
-
-export {}
