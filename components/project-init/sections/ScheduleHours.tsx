@@ -1,77 +1,70 @@
 'use client'
 
-import {
-  HOLIDAY_CALENDARS,
-  PROGRESS_METHODS,
-  REPORTING_FREQUENCIES,
-  SHIFT_PATTERNS,
-  WORKING_DAYS_OPTIONS,
-} from '@/lib/project-init/constants'
 import { FieldGrid, NumberField, SectionHeader, SelectField, SubsectionTitle, SwitchField, TextField } from '../FormFields'
+import { useProjectFormI18n } from '../ProjectFormI18n'
 import type { ProjectInitializationFormValues } from '@/lib/project-init/schema'
 
 export function ScheduleHoursSection() {
+  const { t, options } = useProjectFormI18n()
+
   return (
     <div>
-      <SectionHeader
-        title="Schedule & Working Hours"
-        description="Baseline dates, working calendar, shift patterns, and progress reporting configuration."
-      />
+      <SectionHeader title={t('sections.scheduleHours.title')} description={t('sections.scheduleHours.description')} />
 
       <FieldGrid cols={2}>
-        <SubsectionTitle>Dates</SubsectionTitle>
-        <TextField<ProjectInitializationFormValues> name="plannedStartDate" label="Planned Start Date" type="date" required />
-        <TextField<ProjectInitializationFormValues> name="plannedFinishDate" label="Planned Finish Date" type="date" required />
-        <TextField<ProjectInitializationFormValues> name="actualStartDate" label="Actual Start Date (if known)" type="date" />
+        <SubsectionTitle>{t('subsections.dates')}</SubsectionTitle>
+        <TextField<ProjectInitializationFormValues> name="plannedStartDate" label={t('fields.plannedStartDate')} type="date" required />
+        <TextField<ProjectInitializationFormValues> name="plannedFinishDate" label={t('fields.plannedFinishDate')} type="date" required />
+        <TextField<ProjectInitializationFormValues> name="actualStartDate" label={t('fields.actualStartDate')} type="date" />
 
-        <SubsectionTitle>Calendar</SubsectionTitle>
+        <SubsectionTitle>{t('subsections.calendar')}</SubsectionTitle>
         <SelectField<ProjectInitializationFormValues>
           name="workingDaysPerWeek"
-          label="Working Days per Week"
+          label={t('fields.workingDaysPerWeek')}
           required
-          options={WORKING_DAYS_OPTIONS}
+          options={options.workingDays}
         />
         <SelectField<ProjectInitializationFormValues>
           name="publicHolidayCalendar"
-          label="Public Holiday Calendar"
+          label={t('fields.publicHolidayCalendar')}
           required
-          options={HOLIDAY_CALENDARS}
+          options={options.holidayCalendars}
         />
 
-        <SubsectionTitle>Shift & Working Hours</SubsectionTitle>
-        <SelectField<ProjectInitializationFormValues> name="shiftPattern" label="Shift Pattern" required options={SHIFT_PATTERNS} />
-        <NumberField<ProjectInitializationFormValues> name="dailyWorkHours" label="Daily Work Hours" required />
+        <SubsectionTitle>{t('subsections.shiftHours')}</SubsectionTitle>
+        <SelectField<ProjectInitializationFormValues> name="shiftPattern" label={t('fields.shiftPattern')} required options={options.shiftPatterns} />
+        <NumberField<ProjectInitializationFormValues> name="dailyWorkHours" label={t('fields.dailyWorkHours')} required />
         <SwitchField<ProjectInitializationFormValues>
           name="nightShiftEnabled"
-          label="Night Shift Enabled"
-          description="Enable if night operations are planned on site."
+          label={t('fields.nightShiftEnabled')}
+          description={t('descriptions.nightShiftEnabled')}
           className="md:col-span-2"
         />
 
-        <SubsectionTitle>Progress Settings</SubsectionTitle>
+        <SubsectionTitle>{t('subsections.progressSettings')}</SubsectionTitle>
         <SelectField<ProjectInitializationFormValues>
           name="progressMeasurementMethod"
-          label="Progress Measurement Method"
+          label={t('fields.progressMeasurementMethod')}
           required
-          options={PROGRESS_METHODS}
+          options={options.progressMethods}
         />
         <SelectField<ProjectInitializationFormValues>
           name="reportingFrequency"
-          label="Reporting Frequency"
+          label={t('fields.reportingFrequency')}
           required
-          options={REPORTING_FREQUENCIES}
+          options={options.reportingFrequencies}
         />
 
-        <SubsectionTitle>Delay Analysis</SubsectionTitle>
+        <SubsectionTitle>{t('subsections.delayAnalysis')}</SubsectionTitle>
         <SwitchField<ProjectInitializationFormValues>
           name="delayAnalysisEnabled"
-          label="Enable Delay Analysis"
-          description="Track and analyze schedule variances against baseline."
+          label={t('fields.delayAnalysisEnabled')}
+          description={t('descriptions.delayAnalysisEnabled')}
         />
         <SwitchField<ProjectInitializationFormValues>
           name="criticalPathMonitoring"
-          label="Critical Path Monitoring"
-          description="Monitor critical path activities for schedule risk."
+          label={t('fields.criticalPathMonitoring')}
+          description={t('descriptions.criticalPathMonitoring')}
         />
       </FieldGrid>
     </div>

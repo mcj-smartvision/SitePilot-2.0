@@ -8,11 +8,14 @@ import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { useProjectFormI18nSafe } from './ProjectFormI18n'
 
 interface BaseFieldProps<T extends FieldValues> {
   name: FieldPath<T>
@@ -29,6 +32,7 @@ function FieldWrapper({
   error,
   className,
   children,
+  ...rest
 }: {
   label: string
   required?: boolean
@@ -36,16 +40,17 @@ function FieldWrapper({
   error?: string
   className?: string
   children: React.ReactNode
-}) {
+} & React.HTMLAttributes<HTMLDivElement>) {
+  const { translateValidation, locale } = useProjectFormI18nSafe()
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-2', className)} {...rest}>
       <Label>
         {label}
         {required ? <span className="text-destructive ml-0.5">*</span> : null}
       </Label>
       {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
       {children}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-destructive">{translateValidation(error) ?? error}</p> : null}
     </div>
   )
 }
@@ -67,7 +72,7 @@ export function TextField<T extends FieldValues>({
 
   return (
     <FieldWrapper label={label} required={required} description={description} error={error} className={className}>
-      <Input type={type} placeholder={placeholder} {...register(name)} />
+      <Input id={String(name)} data-field={String(name)} type={type} placeholder={placeholder} {...register(name)} />
     </FieldWrapper>
   )
 }
@@ -122,9 +127,108 @@ export function SelectField<T extends FieldValues>({
   options,
   placeholder = 'Select...',
   className,
+  onValueChange,
 }: BaseFieldProps<T> & {
   options: readonly { value: string; label: string }[]
   placeholder?: string
+  onValueChange?: (value: string) => void
+}) {
+  const {
+    control,
+    formState: { errors },
+  } = useFormContext<T>()
+  const { translateValidation, locale } = useProjectFormI18nSafe()
+  const error = errors[name]?.message as string | undefined
+
+  return (
+    <FieldWrapper label={label} required={required} description={description} error={error} className={className} data-field={String(name)}>
+      <Controller
+        name={name}
+        control={control}
+        render={({ field }) => (
+          <Select
+            key={`${String(name)}-${locale}`}
+            value={field.value ?? ''}
+            onValueChange={(value) => {
+              field.onChange(value)
+              onValueChange?.(value)
+            }}
+          >
+            <SelectTrigger id={String(name)} data-field={String(name)}>
+              <SelectValue placeholder={placeholder} />
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      />
+    </FieldWrapper>
+  )
+}
+
+/** Grouped dropdown for long standard lists (US, CA, DE, EU, IR, International) */
+export function GroupedSelectField<T extends FieldValues>({
+  name,
+  label,
+  required,
+  description,
+  groups,
+  placeholder = 'Select...',
+  className,
+}: BaseFieldProps<T> & {
+  groups: readonly { group: string; options: readonly { value: string; label: string }[] }[]
+  placeholder?: string
+}) {
+  const {
+    control,
+    formState: { errors },
+  } = useFormContext<T>()
+  const { translateValidation, locale } = useProjectFormI18nSafe()
+  const error = errors[name]?.message as string | undefined
+
+  return (
+    <FieldWrapper label={label} required={required} description={description} error={error} className={className}>
+      <Controller
+        name={name}
+        control={control}
+        render={({ field }) => (
+          <Select key={`${String(name)}-${locale}`} value={field.value ?? ''} onValueChange={field.onChange}>
+            <SelectTrigger>
+              <SelectValue placeholder={placeholder} />
+            </SelectTrigger>
+            <SelectContent className="max-h-80">
+              {groups.map((g) => (
+                <SelectGroup key={g.group}>
+                  <SelectLabel>{g.group}</SelectLabel>
+                  {g.options.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      />
+    </FieldWrapper>
+  )
+}
+
+export function MultiSelectField<T extends FieldValues>({
+  name,
+  label,
+  required,
+  description,
+  options,
+  className,
+}: BaseFieldProps<T> & {
+  options: readonly { value: string; label: string }[]
 }) {
   const {
     control,
@@ -137,20 +241,30 @@ export function SelectField<T extends FieldValues>({
       <Controller
         name={name}
         control={control}
-        render={({ field }) => (
-          <Select value={field.value ?? ''} onValueChange={field.onChange}>
-            <SelectTrigger>
-              <SelectValue placeholder={placeholder} />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        render={({ field }) => {
+          const selected: string[] = Array.isArray(field.value) ? field.value : []
+          return (
+            <div className="grid gap-2 sm:grid-cols-2 rounded-lg border p-3 bg-muted/10">
+              {options.map((opt) => {
+                const checked = selected.includes(opt.value)
+                return (
+                  <label key={opt.value} className="flex items-start gap-2 cursor-pointer text-sm">
+                    <Checkbox
+                      checked={checked}
+                      onChange={(e) => {
+                        const next = e.target.checked
+                          ? [...selected, opt.value]
+                          : selected.filter((v) => v !== opt.value)
+                        field.onChange(next)
+                      }}
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                )
+              })}
+            </div>
+          )
+        }}
       />
     </FieldWrapper>
   )

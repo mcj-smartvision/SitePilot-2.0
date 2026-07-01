@@ -1,36 +1,37 @@
 import { z } from 'zod'
+import { resolveComplianceProfile } from '@/lib/compliance/engine'
 
 const optionalString = z.string().optional().or(z.literal(''))
 const optionalNumber = z.coerce.number().optional().or(z.nan()).transform((v) => (Number.isNaN(v) ? undefined : v))
 
 /** Section 1 — Project Information */
 export const projectInfoSchema = z.object({
-  projectName: z.string().min(2, 'Project name is required'),
-  projectCode: z.string().min(2, 'Project code is required'),
-  projectType: z.string().min(1, 'Project type is required'),
-  status: z.string().min(1, 'Status is required'),
+  projectName: z.string().min(2, 'validation.projectNameRequired'),
+  projectCode: z.string().min(2, 'validation.projectCodeRequired'),
+  projectType: z.string().min(1, 'validation.projectTypeRequired'),
+  status: z.string().min(1, 'validation.statusRequired'),
   description: optionalString,
-  clientName: z.string().min(2, 'Client name is required'),
+  clientName: z.string().min(2, 'validation.clientNameRequired'),
   clientContact: optionalString,
-  clientEmail: z.string().email('Invalid client email').optional().or(z.literal('')),
+  clientEmail: z.string().email('validation.invalidEmail').optional().or(z.literal('')),
   clientPhone: optionalString,
   organizationName: optionalString,
   department: optionalString,
-  contractType: z.string().min(1, 'Contract type is required'),
+  contractType: z.string().min(1, 'validation.contractTypeRequired'),
   contractNumber: optionalString,
   contractValue: optionalNumber,
   contractStartDate: optionalString,
   contractEndDate: optionalString,
-  buildingClassification: z.string().min(1, 'Building classification is required'),
-  projectPhase: z.string().min(1, 'Project phase is required'),
+  buildingClassification: z.string().min(1, 'validation.buildingClassificationRequired'),
+  projectPhase: z.string().min(1, 'validation.projectPhaseRequired'),
   sector: optionalString,
   estimatedWorkforce: optionalNumber,
   peakWorkforce: optionalNumber,
   internalNotes: optionalString,
   publicNotes: optionalString,
-  address: z.string().min(3, 'Site address is required'),
-  city: z.string().min(2, 'City is required'),
-  country: z.string().min(1, 'Country is required'),
+  address: z.string().min(3, 'validation.addressRequired'),
+  city: z.string().min(2, 'validation.cityRequired'),
+  country: z.string().min(1, 'validation.countryRequired'),
   latitude: optionalString,
   longitude: optionalString,
   siteArea: optionalNumber,
@@ -39,7 +40,7 @@ export const projectInfoSchema = z.object({
 /** Section 2 — Project Team (role names; member IDs resolved server-side) */
 export const projectTeamSchema = z.object({
   projectDirector: optionalString,
-  projectManager: z.string().min(2, 'Project manager name is required'),
+  projectManager: z.string().min(2, 'validation.projectManagerRequired'),
   constructionManager: optionalString,
   leadEngineer: optionalString,
   structuralEngineer: optionalString,
@@ -52,30 +53,30 @@ export const projectTeamSchema = z.object({
 
 /** Section 3 — Technical Information */
 export const technicalInfoSchema = z.object({
-  structureType: z.string().min(1, 'Structure type is required'),
+  structureType: z.string().min(1, 'validation.structureTypeRequired'),
   primaryMaterial: optionalString,
-  foundationType: z.string().min(1, 'Foundation type is required'),
+  foundationType: z.string().min(1, 'validation.foundationTypeRequired'),
   soilClassification: optionalString,
   numberOfFloors: optionalNumber,
   totalBuiltArea: optionalNumber,
   basementLevels: optionalNumber,
-  designStage: z.string().min(1, 'Design stage is required'),
+  designStage: z.string().min(1, 'validation.designStageRequired'),
   designStandard: optionalString,
   architectFirm: optionalString,
 })
 
 /** Section 4 — Schedule & Working Hours (base object for merge / field keys) */
 const scheduleHoursObjectSchema = z.object({
-  plannedStartDate: z.string().min(1, 'Planned start date is required'),
-  plannedFinishDate: z.string().min(1, 'Planned finish date is required'),
+  plannedStartDate: z.string().min(1, 'validation.plannedStartRequired'),
+  plannedFinishDate: z.string().min(1, 'validation.plannedFinishRequired'),
   actualStartDate: optionalString,
-  workingDaysPerWeek: z.string().min(1, 'Working days per week is required'),
-  publicHolidayCalendar: z.string().min(1, 'Holiday calendar is required'),
-  shiftPattern: z.string().min(1, 'Shift pattern is required'),
-  dailyWorkHours: z.coerce.number().min(1, 'Daily work hours must be at least 1').max(24, 'Cannot exceed 24 hours'),
+  workingDaysPerWeek: z.string().min(1, 'validation.workingDaysRequired'),
+  publicHolidayCalendar: z.string().min(1, 'validation.holidayCalendarRequired'),
+  shiftPattern: z.string().min(1, 'validation.shiftPatternRequired'),
+  dailyWorkHours: z.coerce.number().min(1, 'validation.dailyWorkHoursMin').max(24, 'validation.dailyWorkHoursMax'),
   nightShiftEnabled: z.boolean().default(false),
-  progressMeasurementMethod: z.string().min(1, 'Progress method is required'),
-  reportingFrequency: z.string().min(1, 'Reporting frequency is required'),
+  progressMeasurementMethod: z.string().min(1, 'validation.progressMethodRequired'),
+  reportingFrequency: z.string().min(1, 'validation.reportingFrequencyRequired'),
   delayAnalysisEnabled: z.boolean().default(true),
   criticalPathMonitoring: z.boolean().default(true),
 })
@@ -83,7 +84,7 @@ const scheduleHoursObjectSchema = z.object({
 const scheduleDateRefine = {
   check: (data: { plannedStartDate?: string; plannedFinishDate?: string }) =>
     !data.plannedStartDate || !data.plannedFinishDate || data.plannedFinishDate >= data.plannedStartDate,
-  message: 'Finish date must be on or after start date' as const,
+  message: 'validation.finishDateAfterStart' as const,
   path: ['plannedFinishDate'] as const,
 }
 
@@ -93,13 +94,29 @@ export const scheduleHoursSchema = scheduleHoursObjectSchema.refine(scheduleDate
   path: [...scheduleDateRefine.path],
 })
 
-/** Section 5 — Standards & Location */
+/** User-defined standard not in the regional catalog */
+export const customStandardEntrySchema = z.object({
+  id: z.string(),
+  code: z.string().min(1, 'validation.customStandardCodeRequired'),
+  name: z.string().min(2, 'validation.customStandardNameRequired'),
+  description: optionalString,
+  category: optionalString,
+})
+
+/** Section 5 — Construction Compliance & Location */
 export const standardsLocationSchema = z.object({
-  region: z.string().min(1, 'Region is required'),
-  timezone: z.string().min(1, 'Timezone is required'),
-  safetyStandard: z.string().min(1, 'Safety standard is required'),
-  qualityStandard: optionalString,
-  environmentalStandard: optionalString,
+  region: z.string().min(1, 'validation.regionRequired'),
+  timezone: z.string().min(1, 'validation.timezoneRequired'),
+  /** Hierarchical compliance — region determines auto-activated standards */
+  regulatoryRegion: z.string().min(1, 'validation.regulatoryRegionRequired'),
+  constructionType: z.string().min(1, 'validation.constructionTypeRequired'),
+  /** User-selected compliance standards (mandatory keys enforced in UI + engine) */
+  selectedStandards: z.array(z.string()).default([]),
+  /** Standards added manually when not listed in the catalog */
+  customStandards: z.array(customStandardEntrySchema).default([]),
+  additionalStandards: z.array(z.string()).default([]),
+  customRegulatoryNote: optionalString,
+  customStandardNote: optionalString,
   bimEnabled: z.boolean().default(false),
   bimLevel: optionalString,
   modelCoordinationRequired: z.boolean().default(false),
@@ -127,10 +144,11 @@ export const projectDocumentsSchema = z.object({
 
 /** Section 8 — Project Settings */
 export const projectSettingsSchema = z.object({
-  currency: z.string().min(1, 'Currency is required'),
-  language: z.string().min(1, 'Language is required'),
-  dateFormat: z.string().min(1, 'Date format is required'),
-  weatherProvider: z.string().min(1, 'Weather provider is required'),
+  interfaceLanguage: optionalString,
+  currency: z.string().min(1, 'validation.currencyRequired'),
+  language: z.string().min(1, 'validation.languageRequired'),
+  dateFormat: z.string().min(1, 'validation.dateFormatRequired'),
+  weatherProvider: z.string().min(1, 'validation.weatherProviderRequired'),
   enableWeatherAlerts: z.boolean().default(true),
   enableSafetyDashboard: z.boolean().default(true),
   enableProgressDashboard: z.boolean().default(true),
@@ -179,6 +197,7 @@ export const STEP_FIELD_NAMES: (keyof ProjectInitializationFormValues)[][] = [
 ]
 
 export const defaultFormValues: ProjectInitializationFormValues = {
+  interfaceLanguage: '',
   projectName: '',
   projectCode: '',
   projectType: '',
@@ -242,9 +261,13 @@ export const defaultFormValues: ProjectInitializationFormValues = {
   criticalPathMonitoring: true,
   region: 'middle_east',
   timezone: 'Asia/Tehran',
-  safetyStandard: 'local_hse',
-  qualityStandard: '',
-  environmentalStandard: '',
+  regulatoryRegion: '',
+  constructionType: '',
+  selectedStandards: [],
+  customStandards: [],
+  additionalStandards: [],
+  customRegulatoryNote: '',
+  customStandardNote: '',
   bimEnabled: false,
   bimLevel: 'none',
   modelCoordinationRequired: false,
@@ -275,11 +298,13 @@ export const defaultFormValues: ProjectInitializationFormValues = {
 
 /** Payload shape sent to the API — server assigns hidden IDs */
 export interface ProjectInitializationPayload {
+  language: Record<string, unknown>
   project: Record<string, unknown>
   team: Record<string, unknown>
   technical: Record<string, unknown>
   schedule: Record<string, unknown>
   standards: Record<string, unknown>
+  compliance: Record<string, unknown>
   uploads: Record<string, unknown>
   documents: Record<string, unknown>
   settings: Record<string, unknown>
@@ -287,7 +312,20 @@ export interface ProjectInitializationPayload {
 }
 
 export function buildSubmissionPayload(values: ProjectInitializationFormValues): ProjectInitializationPayload {
+  const complianceProfile = resolveComplianceProfile({
+    regulatoryRegion: values.regulatoryRegion,
+    constructionType: values.constructionType,
+    selectedStandards: values.selectedStandards ?? [],
+    customStandards: values.customStandards ?? [],
+    additionalStandards: values.additionalStandards ?? [],
+    customRegulatoryNote: values.customRegulatoryNote,
+    customStandardNote: values.customStandardNote,
+  })
+
   return {
+    language: {
+      interfaceLanguage: values.interfaceLanguage,
+    },
     project: {
       name: values.projectName,
       code: values.projectCode,
@@ -362,12 +400,23 @@ export function buildSubmissionPayload(values: ProjectInitializationFormValues):
     standards: {
       region: values.region,
       timezone: values.timezone,
-      safetyStandard: values.safetyStandard,
-      qualityStandard: values.qualityStandard,
-      environmentalStandard: values.environmentalStandard,
       bimEnabled: values.bimEnabled,
       bimLevel: values.bimLevel,
       modelCoordinationRequired: values.modelCoordinationRequired,
+    },
+    compliance: {
+      regulatoryRegion: values.regulatoryRegion,
+      constructionType: values.constructionType,
+      selectedStandards: values.selectedStandards ?? [],
+      customStandards: values.customStandards ?? [],
+      additionalStandards: values.additionalStandards ?? [],
+      customRegulatoryNote: values.customRegulatoryNote || null,
+      customStandardNote: values.customStandardNote || null,
+      mandatoryStandards: complianceProfile.mandatoryStandards,
+      optionalStandards: complianceProfile.optionalStandards,
+      activatedStandards: complianceProfile.activatedStandards,
+      standardsByFamily: complianceProfile.standardsByFamily,
+      aiComplianceContext: complianceProfile.aiComplianceContext,
     },
     uploads: {
       scheduleFileName: values.scheduleFileName,

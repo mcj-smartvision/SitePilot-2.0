@@ -1,40 +1,34 @@
 'use client'
 
-import {
-  DESIGN_STAGES,
-  FOUNDATION_TYPES,
-  SOIL_CLASSIFICATIONS,
-  STRUCTURE_TYPES,
-} from '@/lib/project-init/constants'
 import { FieldGrid, NumberField, SectionHeader, SelectField, SubsectionTitle, TextField } from '../FormFields'
+import { useProjectFormI18n } from '../ProjectFormI18n'
 import type { ProjectInitializationFormValues } from '@/lib/project-init/schema'
 
 export function TechnicalInfoSection() {
+  const { t, options } = useProjectFormI18n()
+
   return (
     <div>
-      <SectionHeader
-        title="Technical Information"
-        description="Structural system, geotechnical context, building metrics, and design stage for planning controls."
-      />
+      <SectionHeader title={t('sections.technicalInfo.title')} description={t('sections.technicalInfo.description')} />
 
       <FieldGrid cols={2}>
-        <SubsectionTitle>Structure</SubsectionTitle>
-        <SelectField<ProjectInitializationFormValues> name="structureType" label="Structure Type" required options={STRUCTURE_TYPES} />
-        <TextField<ProjectInitializationFormValues> name="primaryMaterial" label="Primary Material" />
+        <SubsectionTitle>{t('subsections.structure')}</SubsectionTitle>
+        <SelectField<ProjectInitializationFormValues> name="structureType" label={t('fields.structureType')} required options={options.structureTypes} />
+        <TextField<ProjectInitializationFormValues> name="primaryMaterial" label={t('fields.primaryMaterial')} />
 
-        <SubsectionTitle>Foundation</SubsectionTitle>
-        <SelectField<ProjectInitializationFormValues> name="foundationType" label="Foundation Type" required options={FOUNDATION_TYPES} />
-        <SelectField<ProjectInitializationFormValues> name="soilClassification" label="Soil Classification" options={SOIL_CLASSIFICATIONS} />
+        <SubsectionTitle>{t('subsections.foundation')}</SubsectionTitle>
+        <SelectField<ProjectInitializationFormValues> name="foundationType" label={t('fields.foundationType')} required options={options.foundationTypes} />
+        <SelectField<ProjectInitializationFormValues> name="soilClassification" label={t('fields.soilClassification')} options={options.soilClassifications} />
 
-        <SubsectionTitle>Building Information</SubsectionTitle>
-        <NumberField<ProjectInitializationFormValues> name="numberOfFloors" label="Number of Floors" />
-        <NumberField<ProjectInitializationFormValues> name="totalBuiltArea" label="Total Built Area (m²)" />
-        <NumberField<ProjectInitializationFormValues> name="basementLevels" label="Basement Levels" />
+        <SubsectionTitle>{t('subsections.buildingInfo')}</SubsectionTitle>
+        <NumberField<ProjectInitializationFormValues> name="numberOfFloors" label={t('fields.numberOfFloors')} />
+        <NumberField<ProjectInitializationFormValues> name="totalBuiltArea" label={t('fields.totalBuiltArea')} />
+        <NumberField<ProjectInitializationFormValues> name="basementLevels" label={t('fields.basementLevels')} />
 
-        <SubsectionTitle>Design Information</SubsectionTitle>
-        <SelectField<ProjectInitializationFormValues> name="designStage" label="Design Stage" required options={DESIGN_STAGES} />
-        <TextField<ProjectInitializationFormValues> name="designStandard" label="Design Standard / Code" />
-        <TextField<ProjectInitializationFormValues> name="architectFirm" label="Architect Firm" />
+        <SubsectionTitle>{t('subsections.designInfo')}</SubsectionTitle>
+        <SelectField<ProjectInitializationFormValues> name="designStage" label={t('fields.designStage')} required options={options.designStages} />
+        <TextField<ProjectInitializationFormValues> name="designStandard" label={t('fields.designStandard')} />
+        <TextField<ProjectInitializationFormValues> name="architectFirm" label={t('fields.architectFirm')} />
       </FieldGrid>
     </div>
   )

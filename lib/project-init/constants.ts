@@ -134,26 +134,8 @@ export const TIMEZONES = [
   { value: 'America/New_York', label: 'America/New_York (EST/EDT)' },
 ] as const
 
-export const SAFETY_STANDARDS = [
-  { value: 'osha', label: 'OSHA' },
-  { value: 'iso_45001', label: 'ISO 45001' },
-  { value: 'local_hse', label: 'Local HSE Code' },
-  { value: 'project_specific', label: 'Project-Specific Plan' },
-] as const
-
-export const QUALITY_STANDARDS = [
-  { value: 'iso_9001', label: 'ISO 9001' },
-  { value: 'astm', label: 'ASTM' },
-  { value: 'bs', label: 'British Standards (BS)' },
-  { value: 'local_code', label: 'Local Building Code' },
-] as const
-
-export const ENVIRONMENTAL_STANDARDS = [
-  { value: 'iso_14001', label: 'ISO 14001' },
-  { value: 'leed', label: 'LEED' },
-  { value: 'breeam', label: 'BREEAM' },
-  { value: 'none', label: 'Not Applicable' },
-] as const
+/** Full standards lists — see standards-catalog.ts */
+export { STANDARDS_REGIONS, getStandardsByCategory, toGroupedSelectOptions, findStandard } from './standards-catalog'
 
 export const BIM_LEVELS = [
   { value: 'none', label: 'No BIM' },
@@ -181,10 +163,14 @@ export const CURRENCIES = [
 
 export const LANGUAGES = [
   { value: 'en', label: 'English' },
-  { value: 'fa', label: 'Persian (Farsi)' },
-  { value: 'ar', label: 'Arabic' },
-  { value: 'tr', label: 'Turkish' },
+  { value: 'ar', label: 'Arabic (العربية)' },
+  { value: 'fa', label: 'Persian (فارسی)' },
+  { value: 'de', label: 'German (Deutsch)' },
+  { value: 'fr', label: 'French (Français)' },
 ] as const
+
+/** Languages shown on step 1 — same set as project settings */
+export const INTERFACE_LANGUAGES = LANGUAGES
 
 export const DATE_FORMATS = [
   { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
@@ -203,7 +189,7 @@ export const FORM_STEPS = [
   { id: 1, key: 'projectTeam', title: 'Project Team', description: 'Management, engineering, QA, and commercial roles' },
   { id: 2, key: 'technicalInfo', title: 'Technical Information', description: 'Structure, foundation, and design data' },
   { id: 3, key: 'scheduleHours', title: 'Schedule & Hours', description: 'Dates, calendar, shifts, and progress settings' },
-  { id: 4, key: 'standardsLocation', title: 'Standards & Location', description: 'Regional standards and BIM configuration' },
+  { id: 4, key: 'standardsLocation', title: 'Construction Compliance', description: 'Regulatory region, construction type, and auto-activated standards' },
   { id: 5, key: 'scheduleUpload', title: 'Schedule Upload', description: 'Baseline schedule file and validation rules' },
   { id: 6, key: 'projectDocuments', title: 'Project Documents', description: 'Upload categorized project files' },
   { id: 7, key: 'projectSettings', title: 'Project Settings', description: 'Regional, weather, dashboard, and permissions' },

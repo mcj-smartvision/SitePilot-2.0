@@ -1,38 +1,38 @@
 'use client'
 
 import { FieldGrid, FileDropzone, SectionHeader, SwitchField } from '../FormFields'
+import { useProjectFormI18n } from '../ProjectFormI18n'
 import type { ProjectInitializationFormValues } from '@/lib/project-init/schema'
 
 export function ScheduleUploadSection() {
+  const { t } = useProjectFormI18n()
+
   return (
     <div>
-      <SectionHeader
-        title="Schedule Upload"
-        description="Upload the baseline schedule (P6 XER, MSP, or Primavera XML). Validation rules apply on import."
-      />
+      <SectionHeader title={t('sections.scheduleUpload.title')} description={t('sections.scheduleUpload.description')} />
 
       <FieldGrid cols={1}>
         <FileDropzone<ProjectInitializationFormValues>
           name="scheduleFileName"
-          label="Baseline Schedule File"
-          description="Accepted formats: .xer, .mpp, .xml, .xlsx"
+          label={t('fields.scheduleFileName')}
+          description={t('descriptions.scheduleFileName')}
           accept=".xer,.mpp,.xml,.xlsx,.csv"
         />
 
         <SwitchField<ProjectInitializationFormValues>
           name="validateScheduleOnUpload"
-          label="Validate Schedule on Upload"
-          description="Run integrity checks (logic ties, calendar, missing dates) before accepting the file."
+          label={t('fields.validateScheduleOnUpload')}
+          description={t('descriptions.validateScheduleOnUpload')}
         />
         <SwitchField<ProjectInitializationFormValues>
           name="autoLinkActivities"
-          label="Auto-Link Activities"
-          description="Automatically map activities to WBS templates when templates are configured server-side."
+          label={t('fields.autoLinkActivities')}
+          description={t('descriptions.autoLinkActivities')}
         />
         <SwitchField<ProjectInitializationFormValues>
           name="requireBaselineApproval"
-          label="Require Baseline Approval"
-          description="Baseline must be approved before progress tracking begins — standard for EPC contracts."
+          label={t('fields.requireBaselineApproval')}
+          description={t('descriptions.requireBaselineApproval')}
         />
       </FieldGrid>
     </div>

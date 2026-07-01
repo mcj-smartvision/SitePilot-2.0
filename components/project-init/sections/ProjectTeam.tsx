@@ -1,34 +1,34 @@
 'use client'
 
 import { FieldGrid, SectionHeader, SubsectionTitle, TextField } from '../FormFields'
+import { useProjectFormI18n } from '../ProjectFormI18n'
 import type { ProjectInitializationFormValues } from '@/lib/project-init/schema'
 
 export function ProjectTeamSection() {
+  const { t } = useProjectFormI18n()
+
   return (
     <div>
-      <SectionHeader
-        title="Project Team"
-        description="Key personnel assignments. User accounts and IDs are linked server-side after submission."
-      />
+      <SectionHeader title={t('sections.projectTeam.title')} description={t('sections.projectTeam.description')} />
 
       <FieldGrid cols={2}>
-        <SubsectionTitle>Management</SubsectionTitle>
-        <TextField<ProjectInitializationFormValues> name="projectDirector" label="Project Director" />
-        <TextField<ProjectInitializationFormValues> name="projectManager" label="Project Manager" required />
-        <TextField<ProjectInitializationFormValues> name="constructionManager" label="Construction Manager" />
+        <SubsectionTitle>{t('subsections.management')}</SubsectionTitle>
+        <TextField<ProjectInitializationFormValues> name="projectDirector" label={t('fields.projectDirector')} />
+        <TextField<ProjectInitializationFormValues> name="projectManager" label={t('fields.projectManager')} required />
+        <TextField<ProjectInitializationFormValues> name="constructionManager" label={t('fields.constructionManager')} />
 
-        <SubsectionTitle>Engineering</SubsectionTitle>
-        <TextField<ProjectInitializationFormValues> name="leadEngineer" label="Lead Engineer" />
-        <TextField<ProjectInitializationFormValues> name="structuralEngineer" label="Structural Engineer" />
-        <TextField<ProjectInitializationFormValues> name="mepEngineer" label="MEP Engineer" />
+        <SubsectionTitle>{t('subsections.engineering')}</SubsectionTitle>
+        <TextField<ProjectInitializationFormValues> name="leadEngineer" label={t('fields.leadEngineer')} />
+        <TextField<ProjectInitializationFormValues> name="structuralEngineer" label={t('fields.structuralEngineer')} />
+        <TextField<ProjectInitializationFormValues> name="mepEngineer" label={t('fields.mepEngineer')} />
 
-        <SubsectionTitle>Quality Assurance</SubsectionTitle>
-        <TextField<ProjectInitializationFormValues> name="qaManager" label="QA Manager" />
-        <TextField<ProjectInitializationFormValues> name="qcInspector" label="QC Inspector" />
+        <SubsectionTitle>{t('subsections.qa')}</SubsectionTitle>
+        <TextField<ProjectInitializationFormValues> name="qaManager" label={t('fields.qaManager')} />
+        <TextField<ProjectInitializationFormValues> name="qcInspector" label={t('fields.qcInspector')} />
 
-        <SubsectionTitle>Commercial</SubsectionTitle>
-        <TextField<ProjectInitializationFormValues> name="commercialManager" label="Commercial Manager" />
-        <TextField<ProjectInitializationFormValues> name="procurementLead" label="Procurement Lead" />
+        <SubsectionTitle>{t('subsections.commercial')}</SubsectionTitle>
+        <TextField<ProjectInitializationFormValues> name="commercialManager" label={t('fields.commercialManager')} />
+        <TextField<ProjectInitializationFormValues> name="procurementLead" label={t('fields.procurementLead')} />
       </FieldGrid>
     </div>
   )

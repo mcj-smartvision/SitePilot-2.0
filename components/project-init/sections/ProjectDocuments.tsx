@@ -1,36 +1,36 @@
 'use client'
 
 import { FieldGrid, FileDropzone, SectionHeader, SubsectionTitle, TextareaField } from '../FormFields'
+import { useProjectFormI18n } from '../ProjectFormI18n'
 import type { ProjectInitializationFormValues } from '@/lib/project-init/schema'
 
 export function ProjectDocumentsSection() {
+  const { t } = useProjectFormI18n()
+
   return (
     <div>
-      <SectionHeader
-        title="Project Documents"
-        description="Upload and categorize key project documents. Files are stored server-side with metadata."
-      />
+      <SectionHeader title={t('sections.projectDocuments.title')} description={t('sections.projectDocuments.description')} />
 
       <FieldGrid cols={2}>
-        <SubsectionTitle>Contract Documents</SubsectionTitle>
+        <SubsectionTitle>{t('subsections.contractDocuments')}</SubsectionTitle>
         <FileDropzone<ProjectInitializationFormValues>
           name="contractDocumentsFile"
-          label="Upload Contract Documents"
+          label={t('fields.contractDocumentsFile')}
           accept=".pdf,.doc,.docx"
         />
-        <TextareaField<ProjectInitializationFormValues> name="contractDocumentsNote" label="Contract Documents Notes" rows={2} />
+        <TextareaField<ProjectInitializationFormValues> name="contractDocumentsNote" label={t('fields.contractDocumentsNote')} rows={2} />
 
-        <SubsectionTitle>Drawings</SubsectionTitle>
-        <FileDropzone<ProjectInitializationFormValues> name="drawingsFile" label="Upload Drawings" accept=".pdf,.dwg,.dxf" />
-        <TextareaField<ProjectInitializationFormValues> name="drawingsNote" label="Drawings Notes" rows={2} />
+        <SubsectionTitle>{t('subsections.drawings')}</SubsectionTitle>
+        <FileDropzone<ProjectInitializationFormValues> name="drawingsFile" label={t('fields.drawingsFile')} accept=".pdf,.dwg,.dxf" />
+        <TextareaField<ProjectInitializationFormValues> name="drawingsNote" label={t('fields.drawingsNote')} rows={2} />
 
-        <SubsectionTitle>Specifications</SubsectionTitle>
-        <FileDropzone<ProjectInitializationFormValues> name="specificationsFile" label="Upload Specifications" accept=".pdf,.doc,.docx" />
-        <TextareaField<ProjectInitializationFormValues> name="specificationsNote" label="Specifications Notes" rows={2} />
+        <SubsectionTitle>{t('subsections.specifications')}</SubsectionTitle>
+        <FileDropzone<ProjectInitializationFormValues> name="specificationsFile" label={t('fields.specificationsFile')} accept=".pdf,.doc,.docx" />
+        <TextareaField<ProjectInitializationFormValues> name="specificationsNote" label={t('fields.specificationsNote')} rows={2} />
 
-        <SubsectionTitle>Permits & Licenses</SubsectionTitle>
-        <FileDropzone<ProjectInitializationFormValues> name="permitsFile" label="Upload Permits" accept=".pdf,.jpg,.png" />
-        <TextareaField<ProjectInitializationFormValues> name="permitsNote" label="Permits Notes" rows={2} />
+        <SubsectionTitle>{t('subsections.permits')}</SubsectionTitle>
+        <FileDropzone<ProjectInitializationFormValues> name="permitsFile" label={t('fields.permitsFile')} accept=".pdf,.jpg,.png" />
+        <TextareaField<ProjectInitializationFormValues> name="permitsNote" label={t('fields.permitsNote')} rows={2} />
       </FieldGrid>
     </div>
   )
