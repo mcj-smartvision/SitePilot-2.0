@@ -21,6 +21,17 @@ export interface FormDictionary {
     mandatoryStandard: string
     selectMandatoryOnly: string
     selectAllStandards: string
+    addCustomStandard: string
+    removeCustomStandard: string
+    catalogStandards: string
+    customStandardsShort: string
+    customStandardCodePlaceholder: string
+    customStandardNamePlaceholder: string
+    customStandardDescPlaceholder: string
+    showOnMap: string
+    mapSearching: string
+    mapLoading: string
+    mapAddressPlaceholder: string
   }
   steps: Record<
     string,
