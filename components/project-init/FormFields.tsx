@@ -1,5 +1,6 @@
 'use client'
 
+import type { HTMLAttributes, ReactNode } from 'react'
 import { useFormContext, Controller, type FieldPath, type FieldValues } from 'react-hook-form'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -39,8 +40,8 @@ function FieldWrapper({
   description?: string
   error?: string
   className?: string
-  children: React.ReactNode
-} & React.HTMLAttributes<HTMLDivElement>) {
+  children: ReactNode
+} & HTMLAttributes<HTMLDivElement>) {
   const { translateValidation, locale } = useProjectFormI18nSafe()
   return (
     <div className={cn('space-y-2', className)} {...rest}>
@@ -347,13 +348,13 @@ export function SectionHeader({ title, description }: { title: string; descripti
   )
 }
 
-export function FieldGrid({ children, cols = 2 }: { children: React.ReactNode; cols?: 1 | 2 | 3 }) {
+export function FieldGrid({ children, cols = 2 }: { children: ReactNode; cols?: 1 | 2 | 3 }) {
   const gridClass =
     cols === 1 ? 'grid-cols-1' : cols === 3 ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'
   return <div className={cn('grid gap-4', gridClass)}>{children}</div>
 }
 
-export function SubsectionTitle({ children }: { children: React.ReactNode }) {
+export function SubsectionTitle({ children }: { children: ReactNode }) {
   return (
     <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground col-span-full mt-2">
       {children}
