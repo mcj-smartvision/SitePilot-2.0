@@ -54,9 +54,14 @@ export default function AdminProjectsPage() {
       <PageHeader
         title="Projects"
         description="Create and manage construction projects. Each project has its own members, positions, and configuration."
+        actions={
+          <Button asChild>
+            <Link href="/admin/projects/initialize">Initialize New Project</Link>
+          </Button>
+        }
       />
 
-      <ProjectForm submitLabel="Create project" onSubmit={handleCreate} />
+      <ProjectForm submitLabel="Quick create project" onSubmit={handleCreate} />
 
       <Card>
         <CardHeader>
