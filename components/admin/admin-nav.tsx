@@ -29,13 +29,14 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
     <div className="flex min-h-[calc(100vh-0px)] bg-muted/30">
       <aside className="hidden lg:flex w-64 flex-col border-r bg-card shrink-0">
         <div className="flex h-16 items-center gap-3 border-b px-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0">
             <HardHat className="h-5 w-5" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <p className="font-bold text-sm leading-tight">SitePilot</p>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Operations</p>
           </div>
+          <HeaderLanguageSwitcher className="shrink-0" />
         </div>
 
         <nav className="flex-1 space-y-1 p-3">
@@ -69,7 +70,6 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
             </p>
           ) : null}
           <div className="flex items-center gap-2">
-            <HeaderLanguageSwitcher />
             <LogoutButton label="Sign out" className="flex-1" />
           </div>
         </div>

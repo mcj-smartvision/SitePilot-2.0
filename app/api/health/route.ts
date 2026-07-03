@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getPublicEnvStatus } from '@/lib/env/public'
+import { createServiceClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,20 +9,39 @@ export async function GET() {
   const env = getPublicEnvStatus()
   const ok = env.supabaseConfigured
 
+  let serviceRoleOk = false
+  let serviceRoleError: string | null = null
+
+  try {
+    const service = createServiceClient()
+    const { error } = await service.auth.admin.listUsers({ page: 1, perPage: 1 })
+    if (error) serviceRoleError = error.message
+    else serviceRoleOk = true
+  } catch (error) {
+    serviceRoleError = error instanceof Error ? error.message : 'Service role not configured'
+  }
+
+  const healthy = ok && serviceRoleOk
+
   return NextResponse.json(
     {
-      status: ok ? 'ok' : 'misconfigured',
-      message: ok
+      status: healthy ? 'ok' : 'misconfigured',
+      message: healthy
         ? 'SitePilot API is running.'
-        : 'Supabase environment variables are missing on this deployment.',
+        : 'Supabase configuration problem — Add Member will fail until fixed.',
       env,
-      hints: ok
+      serviceRole: {
+        configured: serviceRoleOk,
+        error: serviceRoleError,
+      },
+      hints: healthy
         ? []
         : [
-            'Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel → Project → Settings → Environment Variables.',
-            'Redeploy after saving variables.',
+            'In .env.local (local) or Vercel Environment Variables (online), set SUPABASE_SERVICE_ROLE_KEY to the sb_secret key from Supabase → Settings → API.',
+            'Use sb_publishable for NEXT_PUBLIC_SUPABASE_ANON_KEY — not the secret key.',
+            'After saving, restart npm run dev locally or Redeploy on Vercel.',
           ],
     },
-    { status: ok ? 200 : 503 }
+    { status: healthy ? 200 : 503 }
   )
 }
