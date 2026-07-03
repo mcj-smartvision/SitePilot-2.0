@@ -1,0 +1,90 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useSupabase } from '@/hooks/useSupabase'
+import { createPosition, fetchPositions, updatePosition } from '@/utils/admin'
+import { PageHeader, LoadingBlock, ErrorBlock, StatusBadge } from '@/components/admin/shared'
+import { PositionForm } from '@/components/admin/position-form'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import type { CreatePositionInput, Position } from '@/types/admin'
+
+export default function ProjectPositionsPage({ params }: { params: { projectId: string } }) {
+  const supabase = useSupabase()
+  const [positions, setPositions] = useState<Position[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  async function loadPositions() {
+    const data = await fetchPositions(supabase, params.projectId)
+    setPositions(data)
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        setLoading(true)
+        await loadPositions()
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load positions')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [supabase, params.projectId])
+
+  async function handleCreate(input: CreatePositionInput) {
+    await createPosition(supabase, params.projectId, input)
+    await loadPositions()
+  }
+
+  async function toggleActive(position: Position) {
+    await updatePosition(supabase, position.id, { is_active: !position.is_active })
+    await loadPositions()
+  }
+
+  if (loading) return <LoadingBlock label="Loading positions..." />
+  if (error) return <ErrorBlock message={error} onRetry={() => window.location.reload()} />
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Positions"
+        description="Define project-scoped positions used for access control, notifications, and dashboard personalization."
+      />
+
+      <PositionForm submitLabel="Create position" onSubmit={handleCreate} />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Project positions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {positions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No positions created yet.</p>
+          ) : (
+            positions.map((position) => (
+              <div key={position.id} className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{position.title}</p>
+                    <StatusBadge active={position.is_active} />
+                  </div>
+                  <p className="text-sm text-muted-foreground">{position.key}</p>
+                  {position.description ? <p className="text-sm mt-1">{position.description}</p> : null}
+                </div>
+                <Button variant="outline" size="sm" onClick={() => toggleActive(position)}>
+                  {position.is_active ? 'Deactivate' : 'Activate'}
+                </Button>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

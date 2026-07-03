@@ -1,0 +1,54 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useSupabase } from '@/hooks/useSupabase'
+import { fetchReportsArchive } from '@/utils/reports'
+import type { ReportWithAnalysis } from '@/types'
+import type { WidgetRenderContext } from '@/types/dashboard'
+import { WidgetShell } from '@/components/widgets/widget-shell'
+import { Skeleton } from '@/components/ui/skeleton'
+
+export function ReportWidget({ context }: { context: WidgetRenderContext }) {
+  const supabase = useSupabase()
+  const [reports, setReports] = useState<ReportWithAnalysis[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchReportsArchive(supabase, context.projectId ?? undefined)
+      .then(setReports)
+      .finally(() => setLoading(false))
+  }, [context.projectId, supabase])
+
+  return (
+    <WidgetShell
+      title="Recent Reports"
+      description="Latest site photo reports"
+      action={
+        <Link href="/reports/new" className="text-xs text-primary underline">
+          New report
+        </Link>
+      }
+    >
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
+        </div>
+      ) : reports.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No reports submitted yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {reports.slice(0, 5).map((report) => (
+            <li key={report.id} className="rounded-md border px-3 py-2 text-sm">
+              <p className="font-medium">{report.activity_type ?? 'Site report'}</p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(report.created_at).toLocaleString()} · workforce {report.workforce_count ?? '—'}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </WidgetShell>
+  )
+}
