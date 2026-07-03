@@ -1,12 +1,15 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useFormContext } from 'react-hook-form'
 import { CONSTRUCTION_TYPES, REGULATORY_REGIONS } from '@/lib/compliance/catalog'
 import { BIM_LEVELS } from '@/lib/project-init/constants'
 import { ComplianceStandardsSelector } from '../ComplianceStandardsSelector'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import {
   FieldGrid,
+  MultiSelectField,
   SectionHeader,
   SelectField,
   SubsectionTitle,
@@ -17,13 +20,15 @@ import { useProjectFormI18n } from '../ProjectFormI18n'
 import type { ProjectInitializationFormValues } from '@/lib/project-init/schema'
 
 export function StandardsLocationSection() {
-  const { watch } = useFormContext<ProjectInitializationFormValues>()
+  const { watch, setValue } = useFormContext<ProjectInitializationFormValues>()
   const { t, options, locale } = useProjectFormI18n()
   const regulatoryRegion = watch('regulatoryRegion')
+  const regulatoryRegions = watch('regulatoryRegions') ?? []
+  const useCustomFramework = regulatoryRegion === 'custom'
 
   const regulatoryOptions = useMemo(
     () =>
-      REGULATORY_REGIONS.map((item) => ({
+      REGULATORY_REGIONS.filter((item) => item.value !== 'custom').map((item) => ({
         value: item.value,
         label: t(`options.regulatoryRegions.${item.value}`) || item.label,
       })),
@@ -44,6 +49,14 @@ export function StandardsLocationSection() {
     label: options.bimLevels.find((o) => o.value === item.value)?.label ?? item.label,
   }))
 
+  useEffect(() => {
+    if (useCustomFramework) return
+    const primary = regulatoryRegions[0] ?? ''
+    if (primary && primary !== regulatoryRegion) {
+      setValue('regulatoryRegion', primary, { shouldDirty: true })
+    }
+  }, [regulatoryRegions, regulatoryRegion, useCustomFramework, setValue])
+
   return (
     <div>
       <SectionHeader
@@ -53,22 +66,42 @@ export function StandardsLocationSection() {
 
       <FieldGrid cols={2}>
         <SubsectionTitle>{t('subsections.complianceFramework')}</SubsectionTitle>
-        <SelectField<ProjectInitializationFormValues>
-          name="regulatoryRegion"
-          label={t('fields.regulatoryRegion')}
-          required
-          options={regulatoryOptions}
-          description={t('descriptions.regulatoryRegion')}
-        />
-        <SelectField<ProjectInitializationFormValues>
-          name="constructionType"
-          label={t('fields.constructionType')}
-          required
-          options={constructionTypeOptions}
-          description={t('descriptions.constructionType')}
-        />
 
-        {regulatoryRegion === 'custom' ? (
+        <div className="md:col-span-2 flex items-start gap-3 rounded-lg border p-3">
+          <Checkbox
+            id="use-custom-regulatory"
+            checked={useCustomFramework}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setValue('regulatoryRegion', 'custom', { shouldDirty: true })
+                setValue('regulatoryRegions', [], { shouldDirty: true })
+              } else {
+                const next = regulatoryRegions[0] ?? 'germany'
+                setValue('regulatoryRegion', next, { shouldDirty: true })
+                if (regulatoryRegions.length === 0) {
+                  setValue('regulatoryRegions', [next], { shouldDirty: true })
+                }
+              }
+            }}
+          />
+          <div>
+            <Label htmlFor="use-custom-regulatory" className="cursor-pointer">
+              {t('fields.useCustomRegulatory')}
+            </Label>
+            <p className="text-xs text-muted-foreground mt-0.5">{t('descriptions.useCustomRegulatory')}</p>
+          </div>
+        </div>
+
+        {!useCustomFramework ? (
+          <MultiSelectField<ProjectInitializationFormValues>
+            name="regulatoryRegions"
+            label={t('fields.regulatoryRegions')}
+            required
+            options={regulatoryOptions}
+            description={t('descriptions.regulatoryRegions')}
+            className="md:col-span-2"
+          />
+        ) : (
           <>
             <TextField<ProjectInitializationFormValues>
               name="customRegulatoryNote"
@@ -83,7 +116,15 @@ export function StandardsLocationSection() {
               className="md:col-span-2"
             />
           </>
-        ) : null}
+        )}
+
+        <SelectField<ProjectInitializationFormValues>
+          name="constructionType"
+          label={t('fields.constructionType')}
+          required
+          options={constructionTypeOptions}
+          description={t('descriptions.constructionType')}
+        />
 
         <ComplianceStandardsSelector />
 

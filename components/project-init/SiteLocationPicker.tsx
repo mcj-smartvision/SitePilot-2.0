@@ -17,7 +17,7 @@ import {
 import { loadLeaflet, nominatimReverse, nominatimSearch, type LeafletMap, type LeafletMarker, type LeafletModule } from '@/lib/maps/openstreetmap'
 import type { ProjectInitializationFormValues } from '@/lib/project-init/schema'
 import { useProjectFormI18n } from './ProjectFormI18n'
-import { SelectField } from './FormFields'
+import { SearchableSelectField } from './FormFields'
 import { cn } from '@/lib/utils'
 
 const MAP_LIBRARIES = 'places'
@@ -392,11 +392,12 @@ export function SiteLocationPicker({ className }: { className?: string }) {
           ) : null}
         </div>
 
-        <SelectField<ProjectInitializationFormValues>
+        <SearchableSelectField<ProjectInitializationFormValues>
           name="country"
           label={t('fields.country')}
           required
           options={options.countries}
+          placeholder={t('ui.countrySearchPlaceholder')}
         />
 
         <div className="space-y-2">

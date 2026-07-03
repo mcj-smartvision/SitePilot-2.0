@@ -1,0 +1,5 @@
+# Minimal Supabase CLI config for Edge Functions only.
+# Deploy: supabase functions deploy analyze-invoice --project-ref YOUR_REF
+
+[functions.analyze-invoice]
+verify_jwt = true

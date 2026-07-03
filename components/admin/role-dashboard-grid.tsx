@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { ROLE_DASHBOARD_PREVIEWS } from '@/lib/admin/construction-roles'
 import { CONSTRUCTION_ROLES } from '@/lib/admin/construction-roles'
 import { cn } from '@/lib/utils'
@@ -19,6 +20,11 @@ const trendColors = {
   down: 'text-red-600',
   neutral: 'text-muted-foreground',
   warning: 'text-amber-600',
+}
+
+/** Roles that have a real, dedicated dashboard page */
+const ROLE_DASHBOARD_ROUTES: Record<string, string> = {
+  storekeeper: '/dashboard/storekeeper',
 }
 
 export function RoleDashboardGrid() {
@@ -96,9 +102,18 @@ export function RoleDashboardGrid() {
             </div>
 
             <div className="border-t bg-muted/20 px-5 py-2.5">
-              <button type="button" className="text-xs font-medium text-primary hover:underline">
-                View full {preview.title} dashboard →
-              </button>
+              {ROLE_DASHBOARD_ROUTES[preview.key] ? (
+                <Link
+                  href={ROLE_DASHBOARD_ROUTES[preview.key]}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  View full {preview.title} dashboard →
+                </Link>
+              ) : (
+                <span className="text-xs font-medium text-muted-foreground cursor-default">
+                  {preview.title} dashboard — coming soon
+                </span>
+              )}
             </div>
           </div>
         ))}

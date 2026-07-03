@@ -131,7 +131,9 @@ function toCustomStandardEntries(
 export const standardsLocationSchema = z.object({
   region: z.string().min(1, 'validation.regionRequired'),
   timezone: z.string().min(1, 'validation.timezoneRequired'),
-  /** Hierarchical compliance — region determines auto-activated standards */
+  /** One or more regulatory frameworks (e.g. Germany + European Union together) */
+  regulatoryRegions: z.array(z.string()).default([]),
+  /** Primary region kept for backward-compatible payloads */
   regulatoryRegion: z.string().min(1, 'validation.regulatoryRegionRequired'),
   constructionType: z.string().min(1, 'validation.constructionTypeRequired'),
   /** User-selected compliance standards (mandatory keys enforced in UI + engine) */
@@ -194,6 +196,12 @@ export const projectInitializationSchema = projectInfoSchema
   .refine(scheduleDateRefine.check, {
     message: scheduleDateRefine.message,
     path: [...scheduleDateRefine.path],
+  })
+  .superRefine((data, ctx) => {
+    if (data.regulatoryRegion === 'custom') return
+    if (!data.regulatoryRegions?.length) {
+      ctx.addIssue({ code: 'custom', path: ['regulatoryRegions'], message: 'validation.regulatoryRegionRequired' })
+    }
   })
 
 export type ProjectInitializationFormValues = z.output<typeof projectInitializationSchema>
@@ -286,6 +294,7 @@ export const defaultFormValues: ProjectInitializationFormValues = {
   region: 'middle_east',
   timezone: 'Asia/Tehran',
   regulatoryRegion: '',
+  regulatoryRegions: [] as string[],
   constructionType: '',
   selectedStandards: [],
   customStandards: [],
@@ -336,8 +345,10 @@ export interface ProjectInitializationPayload {
 }
 
 export function buildSubmissionPayload(values: ProjectInitializationFormValues): ProjectInitializationPayload {
+  const primaryRegion = values.regulatoryRegions?.[0] ?? values.regulatoryRegion
   const complianceProfile = resolveComplianceProfile({
-    regulatoryRegion: values.regulatoryRegion,
+    regulatoryRegion: primaryRegion,
+    regulatoryRegions: values.regulatoryRegions ?? [],
     constructionType: values.constructionType,
     selectedStandards: values.selectedStandards ?? [],
     customStandards: toCustomStandardEntries(values.customStandards),
@@ -429,7 +440,8 @@ export function buildSubmissionPayload(values: ProjectInitializationFormValues):
       modelCoordinationRequired: values.modelCoordinationRequired,
     },
     compliance: {
-      regulatoryRegion: values.regulatoryRegion,
+      regulatoryRegion: primaryRegion,
+      regulatoryRegions: values.regulatoryRegions ?? [],
       constructionType: values.constructionType,
       selectedStandards: values.selectedStandards ?? [],
       customStandards: toCustomStandardEntries(values.customStandards),

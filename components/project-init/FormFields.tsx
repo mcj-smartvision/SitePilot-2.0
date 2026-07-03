@@ -1,6 +1,7 @@
 'use client'
 
 import type { HTMLAttributes, ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFormContext, Controller, type FieldPath, type FieldValues } from 'react-hook-form'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -158,7 +159,7 @@ export function SelectField<T extends FieldValues>({
             <SelectTrigger id={String(name)} data-field={String(name)}>
               <SelectValue placeholder={placeholder} />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[9999]">
               {options.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
@@ -167,6 +168,105 @@ export function SelectField<T extends FieldValues>({
             </SelectContent>
           </Select>
         )}
+      />
+    </FieldWrapper>
+  )
+}
+
+/** Searchable dropdown — type first letter / filter; stays above maps (high z-index). */
+export function SearchableSelectField<T extends FieldValues>({
+  name,
+  label,
+  required,
+  description,
+  options,
+  placeholder = 'Type to search...',
+  className,
+  onValueChange,
+}: BaseFieldProps<T> & {
+  options: readonly { value: string; label: string }[]
+  placeholder?: string
+  onValueChange?: (value: string) => void
+}) {
+  const {
+    control,
+    formState: { errors },
+  } = useFormContext<T>()
+  const { translateValidation } = useProjectFormI18nSafe()
+  const error = errors[name]?.message as string | undefined
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
+
+  return (
+    <FieldWrapper label={label} required={required} description={description} error={error} className={className} data-field={String(name)}>
+      <Controller
+        name={name}
+        control={control}
+        render={({ field }) => {
+          const selected = options.find((o) => o.value === field.value)
+          const q = query.trim().toLowerCase()
+          const filtered = !q
+            ? options
+            : options.filter(
+                (o) =>
+                  o.label.toLowerCase().includes(q) ||
+                  o.value.toLowerCase().includes(q) ||
+                  o.label.charAt(0).toLowerCase() === q.charAt(0)
+              )
+
+          return (
+            <div ref={rootRef} className="relative">
+              <Input
+                id={String(name)}
+                data-field={String(name)}
+                value={open ? query : selected?.label ?? ''}
+                placeholder={selected ? selected.label : placeholder}
+                autoComplete="off"
+                onChange={(e) => {
+                  setQuery(e.target.value)
+                  setOpen(true)
+                }}
+                onFocus={() => {
+                  setOpen(true)
+                  setQuery('')
+                }}
+              />
+              {open ? (
+                <div className="absolute z-[9999] mt-1 w-full max-h-60 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-lg">
+                  {filtered.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-muted-foreground">No match</p>
+                  ) : (
+                    filtered.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className="flex w-full px-3 py-2 text-sm text-left hover:bg-accent hover:text-accent-foreground"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          field.onChange(opt.value)
+                          onValueChange?.(opt.value)
+                          setQuery('')
+                          setOpen(false)
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))
+                  )}
+                </div>
+              ) : null}
+            </div>
+          )
+        }}
       />
     </FieldWrapper>
   )
@@ -202,7 +302,7 @@ export function GroupedSelectField<T extends FieldValues>({
             <SelectTrigger>
               <SelectValue placeholder={placeholder} />
             </SelectTrigger>
-            <SelectContent className="max-h-80">
+            <SelectContent className="max-h-80 z-[9999]">
               {groups.map((g) => (
                 <SelectGroup key={g.group}>
                   <SelectLabel>{g.group}</SelectLabel>

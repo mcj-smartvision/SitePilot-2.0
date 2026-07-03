@@ -7,9 +7,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { getStandardByKey } from '@/lib/compliance/catalog'
 import {
-  computeDefaultSelectedKeys,
-  computeMandatoryStandardKeys,
-  getAvailableStandardKeys,
+  computeDefaultSelectedKeysForRegions,
+  computeMandatoryStandardKeysForRegions,
+  getAvailableStandardKeysForRegions,
 } from '@/lib/compliance/region-standards'
 import { getCategoryLabel, getStandardLabel } from '@/lib/compliance/labels'
 import type { ProjectInitializationFormValues } from '@/lib/project-init/schema'
@@ -22,31 +22,37 @@ export function ComplianceStandardsSelector() {
   const { t, locale } = useProjectFormI18n()
 
   const regulatoryRegion = watch('regulatoryRegion')
+  const regulatoryRegions = watch('regulatoryRegions') ?? []
   const constructionType = watch('constructionType')
   const selectedStandards = watch('selectedStandards') ?? []
   const customStandards = watch('customStandards') ?? []
 
-  const prevContext = useRef({ region: '', type: '' })
+  const activeRegions = regulatoryRegion === 'custom' ? [] : regulatoryRegions
+
+  const prevContext = useRef({ regions: '', type: '' })
 
   const mandatoryKeys = useMemo(
-    () => (regulatoryRegion && constructionType ? computeMandatoryStandardKeys(regulatoryRegion, constructionType) : []),
-    [regulatoryRegion, constructionType]
+    () =>
+      activeRegions.length && constructionType
+        ? computeMandatoryStandardKeysForRegions(activeRegions, constructionType)
+        : [],
+    [activeRegions, constructionType]
   )
 
   const availableKeys = useMemo(
-    () => (regulatoryRegion && regulatoryRegion !== 'custom' ? getAvailableStandardKeys(regulatoryRegion) : []),
-    [regulatoryRegion]
+    () => (activeRegions.length ? getAvailableStandardKeysForRegions(activeRegions) : []),
+    [activeRegions]
   )
 
   useEffect(() => {
-    if (!regulatoryRegion || !constructionType || regulatoryRegion === 'custom') return
+    if (!constructionType || regulatoryRegion === 'custom' || activeRegions.length === 0) return
 
-    const contextChanged =
-      prevContext.current.region !== regulatoryRegion || prevContext.current.type !== constructionType
+    const contextKey = `${activeRegions.join(',')}|${constructionType}`
+    const contextChanged = prevContext.current.regions !== contextKey || prevContext.current.type !== constructionType
 
     if (contextChanged) {
-      prevContext.current = { region: regulatoryRegion, type: constructionType }
-      const defaults = computeDefaultSelectedKeys(regulatoryRegion, constructionType)
+      prevContext.current = { regions: contextKey, type: constructionType }
+      const defaults = computeDefaultSelectedKeysForRegions(activeRegions, constructionType)
       const current = getValues('selectedStandards') ?? []
       const preserved = current.filter((k) => availableKeys.includes(k))
       setValue('selectedStandards', [...new Set([...defaults, ...preserved, ...mandatoryKeys])], { shouldDirty: true })
@@ -58,7 +64,7 @@ export function ComplianceStandardsSelector() {
     if (missingMandatory.length > 0) {
       setValue('selectedStandards', [...new Set([...current, ...missingMandatory])], { shouldDirty: true })
     }
-  }, [regulatoryRegion, constructionType, mandatoryKeys, availableKeys, setValue, getValues])
+  }, [regulatoryRegion, activeRegions, constructionType, mandatoryKeys, availableKeys, setValue, getValues])
 
   const grouped = useMemo(() => {
     const groups: Record<string, { key: string; mandatory: boolean; category: string }[]> = {}
@@ -83,7 +89,7 @@ export function ComplianceStandardsSelector() {
   const selectAll = () => setValue('selectedStandards', [...availableKeys], { shouldDirty: true })
   const selectMandatoryOnly = () => setValue('selectedStandards', [...mandatoryKeys], { shouldDirty: true })
 
-  if (!regulatoryRegion || !constructionType) {
+  if (!constructionType) {
     return (
       <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground md:col-span-2">
         {t('descriptions.compliancePreviewEmpty')}
@@ -100,6 +106,14 @@ export function ComplianceStandardsSelector() {
         </div>
         <p className="text-xs text-muted-foreground">{t('descriptions.complianceCustomEmpty')}</p>
         <CustomStandardsEditor />
+      </div>
+    )
+  }
+
+  if (activeRegions.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground md:col-span-2">
+        {t('descriptions.regulatoryRegions')}
       </div>
     )
   }

@@ -14,6 +14,7 @@ import {
 import { cn } from '@/lib/utils'
 import { LogoutButton } from '@/components/auth/logout-button'
 import { HeaderLanguageSwitcher } from '@/components/i18n/header-language-switcher'
+import { HeaderProjectSwitcher } from '@/components/project/header-project-switcher'
 
 const NAV_ITEMS = [
   { href: '/admin', label: 'Control Center', icon: LayoutDashboard, exact: true },
@@ -37,6 +38,10 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Operations</p>
           </div>
           <HeaderLanguageSwitcher className="shrink-0" />
+        </div>
+
+        <div className="border-b px-3 py-3">
+          <HeaderProjectSwitcher className="[&_button]:w-full" />
         </div>
 
         <nav className="flex-1 space-y-1 p-3">
@@ -82,6 +87,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
             <span className="font-bold">SitePilot Admin</span>
           </div>
           <div className="flex items-center gap-2">
+            <HeaderProjectSwitcher />
             <HeaderLanguageSwitcher />
             <LogoutButton label="Out" />
           </div>

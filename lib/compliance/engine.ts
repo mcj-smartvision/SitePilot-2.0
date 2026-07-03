@@ -6,8 +6,11 @@ import { customStandardKey, isCustomStandardKey, listCustomStandards } from './c
 import { getStandardByKey, listStandards } from './catalog'
 import {
   computeDefaultSelectedKeys,
+  computeDefaultSelectedKeysForRegions,
   computeMandatoryStandardKeys,
+  computeMandatoryStandardKeysForRegions,
   getAvailableStandardKeys,
+  getAvailableStandardKeysForRegions,
 } from './region-standards'
 import type {
   ComplianceResolutionInput,
@@ -61,13 +64,22 @@ function mergeCatalogAndCustom(
 }
 
 export function resolveComplianceProfile(input: ComplianceResolutionInput): ComplianceResolutionResult {
+  const regions =
+    input.regulatoryRegions && input.regulatoryRegions.length > 0
+      ? input.regulatoryRegions.filter((r) => r !== 'custom')
+      : []
   const region = isRegulatoryRegion(input.regulatoryRegion) ? input.regulatoryRegion : 'custom'
+  const useMulti = regions.length > 0 && region !== 'custom'
   const constructionType = isConstructionType(input.constructionType)
     ? input.constructionType
     : 'general_building'
 
-  const mandatoryKeys = computeMandatoryStandardKeys(region, constructionType)
-  const availableKeys = new Set(getAvailableStandardKeys(region))
+  const mandatoryKeys = useMulti
+    ? computeMandatoryStandardKeysForRegions(regions, constructionType)
+    : computeMandatoryStandardKeys(region, constructionType)
+  const availableKeys = new Set(
+    useMulti ? getAvailableStandardKeysForRegions(regions) : getAvailableStandardKeys(region)
+  )
   const customEntries = input.customStandards ?? []
   const customKeys = customEntries.map((e) => customStandardKey(e.id))
 
@@ -82,7 +94,9 @@ export function resolveComplianceProfile(input: ComplianceResolutionInput): Comp
   } else if (region === 'custom') {
     catalogSelectedKeys = []
   } else {
-    catalogSelectedKeys = computeDefaultSelectedKeys(region, constructionType)
+    catalogSelectedKeys = useMulti
+      ? computeDefaultSelectedKeysForRegions(regions, constructionType)
+      : computeDefaultSelectedKeys(region, constructionType)
   }
 
   const selectedKeys = [...new Set([...catalogSelectedKeys, ...customKeys])]
@@ -104,7 +118,7 @@ export function resolveComplianceProfile(input: ComplianceResolutionInput): Comp
   }
 
   return {
-    regulatoryRegion: region,
+    regulatoryRegion: useMulti ? regions.join('+') : region,
     constructionType,
     selectedStandards: selectedKeys,
     customStandards: customEntries,

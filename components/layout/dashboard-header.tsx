@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LogoutButton } from '@/components/auth/logout-button'
 import { HeaderLanguageSwitcher } from '@/components/i18n/header-language-switcher'
+import { HeaderProjectSwitcher } from '@/components/project/header-project-switcher'
 import { useLocale } from '@/components/i18n/locale-provider'
 import { HardHat } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -60,6 +61,7 @@ export function DashboardHeader({ email, isAdmin }: DashboardHeaderProps) {
         </nav>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <HeaderProjectSwitcher className="hidden sm:block" />
           <HeaderLanguageSwitcher />
           <span className="text-sm text-muted-foreground hidden md:inline max-w-[180px] truncate">{email}</span>
           <LogoutButton label={app.signOut} />

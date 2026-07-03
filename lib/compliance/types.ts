@@ -57,6 +57,8 @@ export interface CustomStandardEntry {
 
 export interface ComplianceResolutionInput {
   regulatoryRegion: RegulatoryRegionKey | string
+  /** When multiple frameworks apply (e.g. Germany + EU), merge their standards */
+  regulatoryRegions?: string[]
   constructionType: ConstructionTypeKey | string
   /** User-selected catalog standard keys (mandatory keys are always enforced) */
   selectedStandards?: string[]

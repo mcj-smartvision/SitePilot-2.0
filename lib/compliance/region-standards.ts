@@ -7,9 +7,11 @@ import type { ConstructionTypeKey, RegulatoryRegionKey } from './types'
 export const REGION_AVAILABLE_STANDARDS: Record<RegulatoryRegionKey, string[]> = {
   germany: [
     'eu_en_1990', 'eu_en_1991', 'eu_en_1992', 'eu_en_1993', 'eu_en_1994', 'eu_en_1995',
-    'eu_en_1997', 'eu_en_1998', 'de_din_general', 'de_din_en', 'de_vob', 'de_dguv',
-    'de_arbschg', 'de_betr_sichv', 'de_trbs', 'de_mbo', 'de_din_4108', 'de_din_4109',
-    'de_bimschg', 'de_dgnb', 'de_geg', 'iso_9001', 'iso_14001', 'iso_45001', 'iso_19650',
+    'eu_en_1997', 'eu_en_1998', 'de_din_general', 'de_din_en', 'de_din_en_1090', 'de_vob', 'de_dguv',
+    'de_arbschg', 'de_betr_sichv', 'de_trbs', 'de_mbo', 'de_din_4108', 'de_din_4109', 'de_din_1045',
+    'de_din_1052', 'de_din_1054', 'de_din_1055', 'de_din_18345', 'de_din_488', 'de_din_18202',
+    'de_din_1045_1', 'de_din_en_206', 'de_bimschg', 'de_dgnb', 'de_geg', 'iso_9001', 'iso_14001',
+    'iso_45001', 'iso_19650',
   ],
   european_union: [
     'eu_en_1990', 'eu_en_1991', 'eu_en_1992', 'eu_en_1993', 'eu_en_1994', 'eu_en_1995',
@@ -77,12 +79,34 @@ export function getAvailableStandardKeys(region: string): string[] {
   return []
 }
 
+/** Merge available standards from multiple regulatory regions (e.g. Germany + EU). */
+export function getAvailableStandardKeysForRegions(regions: string[]): string[] {
+  const keys = new Set<string>()
+  for (const region of regions) {
+    if (region === 'custom') continue
+    for (const key of getAvailableStandardKeys(region)) keys.add(key)
+  }
+  return [...keys]
+}
+
 export function computeMandatoryStandardKeys(region: string, constructionType: string): string[] {
   const regionKey = region in REGION_MANDATORY_STANDARDS ? (region as RegulatoryRegionKey) : 'custom'
   const base = REGION_MANDATORY_STANDARDS[regionKey] ?? []
   const typeMandatory = TYPE_MANDATORY_STANDARDS[constructionType as ConstructionTypeKey] ?? []
   const available = new Set(getAvailableStandardKeys(regionKey))
   return [...new Set([...base, ...typeMandatory])].filter((k) => available.has(k))
+}
+
+export function computeMandatoryStandardKeysForRegions(regions: string[], constructionType: string): string[] {
+  const keys = new Set<string>()
+  const available = new Set(getAvailableStandardKeysForRegions(regions))
+  for (const region of regions) {
+    if (region === 'custom') continue
+    for (const key of computeMandatoryStandardKeys(region, constructionType)) {
+      if (available.has(key)) keys.add(key)
+    }
+  }
+  return [...keys]
 }
 
 export function computeRecommendedStandardKeys(region: string, constructionType: string): string[] {
@@ -92,6 +116,26 @@ export function computeRecommendedStandardKeys(region: string, constructionType:
   return recommended.filter((k) => available.has(k))
 }
 
+export function computeRecommendedStandardKeysForRegions(regions: string[], constructionType: string): string[] {
+  const keys = new Set<string>()
+  const available = new Set(getAvailableStandardKeysForRegions(regions))
+  for (const region of regions) {
+    for (const key of computeRecommendedStandardKeys(region, constructionType)) {
+      if (available.has(key)) keys.add(key)
+    }
+  }
+  return [...keys]
+}
+
 export function computeDefaultSelectedKeys(region: string, constructionType: string): string[] {
   return [...new Set([...computeMandatoryStandardKeys(region, constructionType), ...computeRecommendedStandardKeys(region, constructionType)])]
+}
+
+export function computeDefaultSelectedKeysForRegions(regions: string[], constructionType: string): string[] {
+  return [
+    ...new Set([
+      ...computeMandatoryStandardKeysForRegions(regions, constructionType),
+      ...computeRecommendedStandardKeysForRegions(regions, constructionType),
+    ]),
+  ]
 }

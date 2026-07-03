@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useForm, FormProvider } from 'react-hook-form'
+import Link from 'next/link'
+import { useForm, FormProvider, type FieldPath } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -139,8 +140,8 @@ function ProjectFormBody({
   }
 
   async function goNext() {
-    const fields = STEP_FIELD_NAMES[step]
-    const fieldValid = await trigger(fields, { shouldFocus: true })
+    const fields = STEP_FIELD_NAMES[step] as (keyof ProjectInitializationFormValues)[]
+    const fieldValid = await trigger(fields as FieldPath<ProjectInitializationFormValues>[], { shouldFocus: true })
     if (!fieldValid) {
       setStepValidationFailed(true)
       requestAnimationFrame(() => scrollToFirstInvalidField(fields))
@@ -155,7 +156,7 @@ function ProjectFormBody({
       for (const issue of sectionResult.error.issues) {
         const fieldName = issue.path[0]
         if (typeof fieldName === 'string') {
-          setError(fieldName as keyof ProjectInitializationFormValues, { message: issue.message })
+          setError(fieldName as FieldPath<ProjectInitializationFormValues>, { message: issue.message })
         }
       }
       setStepValidationFailed(true)
@@ -225,10 +226,23 @@ function ProjectFormBody({
         <Card>
           <CardContent className="pt-6">
             {submitSuccess ? (
-              <Alert>
-                <CheckCircle2 className="h-4 w-4" />
-                <AlertDescription>{t('ui.successMessage')}</AlertDescription>
-              </Alert>
+              <div className="py-10 text-center space-y-6">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                  <CheckCircle2 className="h-8 w-8" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-bold">{t('ui.successTitle')}</h2>
+                  <p className="text-muted-foreground max-w-md mx-auto">{t('ui.successDescription')}</p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button asChild size="lg">
+                    <Link href="/admin/projects">{t('ui.goToProjects')}</Link>
+                  </Button>
+                  <Button type="button" variant="outline" size="lg" onClick={() => setSubmitSuccess(false)}>
+                    {t('ui.registerAnother')}
+                  </Button>
+                </div>
+              </div>
             ) : (
               <>
                 <ActiveSection />
@@ -251,7 +265,9 @@ function ProjectFormBody({
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   ) : (
-                    <Button type="submit">{t('ui.submit')}</Button>
+                    <Button type="submit" size="lg" className="min-w-[180px]">
+                      {t('ui.submit')}
+                    </Button>
                   )}
                 </div>
               </>

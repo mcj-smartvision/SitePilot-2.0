@@ -16,6 +16,11 @@ export interface FormDictionary {
     selectPlaceholder: string
     fixErrors: string
     successMessage: string
+    successTitle: string
+    successDescription: string
+    goToProjects: string
+    registerAnother: string
+    countrySearchPlaceholder: string
     selected: string
     languageHint: string
     mandatoryStandard: string
