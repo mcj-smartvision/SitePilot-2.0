@@ -9,14 +9,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { HardHat, Lock, Mail, ArrowRight } from 'lucide-react'
+import { HardHat, Lock, User, ArrowRight } from 'lucide-react'
+import { normalizeLoginIdentifier } from '@/lib/auth/login-identifier'
 
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { app } = useLocale()
   const redirectParam = searchParams.get('redirect')
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -27,7 +28,11 @@ export default function LoginPage() {
     setError(null)
 
     const supabase = createClient()
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    const authEmail = normalizeLoginIdentifier(identifier)
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: authEmail,
+      password,
+    })
 
     if (signInError) {
       setError(signInError.message)
@@ -75,17 +80,17 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">{app.email}</Label>
+            <Label htmlFor="identifier">Username</Label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="identifier"
+                type="text"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 required
                 className="pl-10 h-11"
-                placeholder="name@company.com"
+                placeholder="sahar"
                 autoComplete="username"
               />
             </div>

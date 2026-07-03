@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ConstructionRoleSelect } from '@/components/admin/construction-role-select'
+import { normalizeLoginIdentifier } from '@/lib/auth/login-identifier'
 import type { CreateMemberInput, Position, ProjectMember } from '@/types/admin'
 import { UserPlus } from 'lucide-react'
 
@@ -54,7 +55,7 @@ export function MemberForm({
     try {
       await onSubmit({
         full_name: fullName.trim(),
-        email: email.trim(),
+        email: normalizeLoginIdentifier(email.trim()),
         phone: phone.trim() || undefined,
         password: showPasswordField ? password : (initial?.admin_visible_password ?? ''),
         is_active: isActive,
@@ -95,7 +96,7 @@ export function MemberForm({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="member-email">Email / Username</Label>
+              <Label htmlFor="member-email">Username</Label>
               <Input
                 id="member-email"
                 type="text"
@@ -104,10 +105,10 @@ export function MemberForm({
                 required
                 disabled={Boolean(initial)}
                 className="h-11"
-                placeholder="sahar@site.local"
+                placeholder="sahar"
               />
               <p className="text-xs text-muted-foreground">
-                Use an email-style login. Example: sahar@site.local
+                Plain username only — no @ needed. Example: sahar
               </p>
             </div>
           </div>

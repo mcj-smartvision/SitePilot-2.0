@@ -5,9 +5,11 @@
 --
 -- STEP 1 (Supabase Dashboard — required for password hashing):
 --   Authentication → Users → Add user → Create new user
---   Email:    sahar@site.local
+--   Email:    sahar@site.local   (internal — user logs in with username: sahar)
 --   Password: 6288
 --   Auto Confirm User: ON
+--
+-- Login on site: username = sahar   password = 6288
 --
 -- STEP 2: Run this SQL block in SQL Editor
 -- =====================================================

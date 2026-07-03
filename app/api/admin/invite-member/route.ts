@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { isSystemAdmin } from '@/lib/admin/access'
 import { createServiceClient } from '@/lib/supabase/service'
 import { createProjectMember, findProfileByEmail } from '@/utils/admin'
+import { normalizeLoginIdentifier } from '@/lib/auth/login-identifier'
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 })
     }
 
-    const normalizedEmail = String(email).trim().toLowerCase()
+    const normalizedEmail = normalizeLoginIdentifier(String(email))
     const service = createServiceClient()
     let profile = await findProfileByEmail(supabase, normalizedEmail)
 

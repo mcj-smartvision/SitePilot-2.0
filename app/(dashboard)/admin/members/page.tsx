@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { AdminProject, Position, ProjectMember } from '@/types/admin'
+import { formatLoginDisplay } from '@/lib/auth/login-identifier'
 import { KeyRound, Pencil, ShieldAlert, UserCheck, Users } from 'lucide-react'
 
 export default function AdminMembersPage() {
@@ -221,7 +222,7 @@ export default function AdminMembersPage() {
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-3.5 font-mono text-xs">{member.email}</td>
+                      <td className="px-4 py-3.5 font-mono text-xs">{formatLoginDisplay(member.email)}</td>
                       <td className="px-4 py-3.5">
                         <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
                           {member.admin_visible_password || '—'}
