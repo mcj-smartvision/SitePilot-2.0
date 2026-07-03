@@ -154,11 +154,11 @@ export default function AdminMembersPage() {
       {projects.length > 0 ? (
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium">Project:</span>
-          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+          <Select value={selectedProjectId || undefined} onValueChange={setSelectedProjectId}>
             <SelectTrigger className="w-[240px]">
               <SelectValue placeholder="Select project" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent position="popper" sideOffset={4}>
               {projects.map((p) => (
                 <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
               ))}

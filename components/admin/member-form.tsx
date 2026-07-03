@@ -98,14 +98,17 @@ export function MemberForm({
               <Label htmlFor="member-email">Email / Username</Label>
               <Input
                 id="member-email"
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={Boolean(initial)}
                 className="h-11"
-                placeholder="name@site.local"
+                placeholder="sahar@site.local"
               />
+              <p className="text-xs text-muted-foreground">
+                Use an email-style login. Example: sahar@site.local
+              </p>
             </div>
           </div>
 

@@ -35,30 +35,36 @@ export function ConstructionRoleSelect({
     return aIdx - bIdx
   })
 
+  const hasPositions = sortedPositions.length > 0
+
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Select value={value} onValueChange={onChange} required>
+      <Select
+        value={value || undefined}
+        onValueChange={onChange}
+        disabled={!hasPositions}
+      >
         <SelectTrigger className="h-11">
           <SelectValue placeholder="Select construction site role..." />
         </SelectTrigger>
-        <SelectContent className="max-h-[320px]">
-          {sortedPositions.length === 0 ? (
-            <SelectItem value="_none" disabled>
-              No positions available — create a project first
+        <SelectContent position="popper" sideOffset={4} className="max-h-[320px]">
+          {sortedPositions.map((position) => (
+            <SelectItem key={position.id} value={position.id}>
+              {position.title}
             </SelectItem>
-          ) : (
-            sortedPositions.map((position) => (
-              <SelectItem key={position.id} value={position.id}>
-                {position.title}
-              </SelectItem>
-            ))
-          )}
+          ))}
         </SelectContent>
       </Select>
-      <p className="text-xs text-muted-foreground">
-        Assign the member&apos;s primary site role. Each role has a dedicated dashboard view.
-      </p>
+      {!hasPositions ? (
+        <p className="text-xs text-amber-600">
+          No positions found for this project. Create a project first or seed default positions.
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Assign the member&apos;s primary site role. Each role has a dedicated dashboard view.
+        </p>
+      )}
     </div>
   )
 }
