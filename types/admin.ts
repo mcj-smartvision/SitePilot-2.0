@@ -62,6 +62,10 @@ export interface Position {
   title: string
   key: string
   description?: string | null
+  name_en?: string | null
+  name_fa?: string | null
+  name_fr?: string | null
+  name_de?: string | null
   is_active: boolean
   created_at: string
   updated_at: string

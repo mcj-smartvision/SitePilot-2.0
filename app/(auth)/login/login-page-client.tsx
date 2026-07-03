@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { HardHat, Lock, User, ArrowRight } from 'lucide-react'
 import { normalizeLoginIdentifier } from '@/lib/auth/login-identifier'
+import { HeaderLanguageSwitcher } from '@/components/i18n/header-language-switcher'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -59,6 +60,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 industrial-gradient relative">
       <div className="absolute inset-0 site-grid-bg opacity-10 pointer-events-none" />
+      <div className="absolute top-4 end-4 z-10">
+        <HeaderLanguageSwitcher />
+      </div>
 
       <div className="relative w-full max-w-[420px] rounded-2xl border border-white/10 bg-background/95 backdrop-blur-sm shadow-elevated p-8 sm:p-10">
         <div className="flex flex-col items-center text-center mb-8">
@@ -80,7 +84,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div className="space-y-2">
-            <Label htmlFor="identifier">Username</Label>
+            <Label htmlFor="identifier">{app.email}</Label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -90,7 +94,7 @@ export default function LoginPage() {
                 onChange={(e) => setIdentifier(e.target.value)}
                 required
                 className="pl-10 h-11"
-                placeholder="sahar"
+                placeholder="mojtaba421@gmail.com"
                 autoComplete="username"
               />
             </div>

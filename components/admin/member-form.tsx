@@ -8,6 +8,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ConstructionRoleSelect } from '@/components/admin/construction-role-select'
 import { normalizeLoginIdentifier } from '@/lib/auth/login-identifier'
+import { getAdminMemberMessages } from '@/lib/i18n/admin-member'
+import { useLocale } from '@/components/i18n/locale-provider'
 import type { CreateMemberInput, Position, ProjectMember } from '@/types/admin'
 import { UserPlus } from 'lucide-react'
 
@@ -17,6 +19,8 @@ interface MemberFormProps {
   submitLabel: string
   onSubmit: (values: CreateMemberInput) => Promise<void>
   showPasswordField?: boolean
+  positionsLoading?: boolean
+  onSeedPositions?: () => Promise<void>
 }
 
 export function MemberForm({
@@ -25,7 +29,11 @@ export function MemberForm({
   submitLabel,
   onSubmit,
   showPasswordField = !initial,
+  positionsLoading = false,
+  onSeedPositions,
 }: MemberFormProps) {
+  const { locale } = useLocale()
+  const t = getAdminMemberMessages(locale)
   const [fullName, setFullName] = useState(initial?.full_name ?? '')
   const [email, setEmail] = useState(initial?.email ?? '')
   const [phone, setPhone] = useState(initial?.phone ?? '')
@@ -35,19 +43,36 @@ export function MemberForm({
     initial?.position_ids?.[0] ?? initial?.positions?.[0]?.id ?? ''
   )
   const [loading, setLoading] = useState(false)
+  const [seeding, setSeeding] = useState(false)
+  const [seedMessage, setSeedMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  async function handleSeed() {
+    if (!onSeedPositions) return
+    setSeeding(true)
+    setSeedMessage(null)
+    setError(null)
+    try {
+      await onSeedPositions()
+      setSeedMessage(t.positionsSeeded)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.seedFailed)
+    } finally {
+      setSeeding(false)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
 
     if (!roleId) {
-      setError('Select a site role.')
+      setError(t.selectRoleError)
       return
     }
 
     if (showPasswordField && password.length < 6) {
-      setError('Password must be at least 6 characters.')
+      setError(t.passwordMinError)
       return
     }
 
@@ -62,10 +87,19 @@ export function MemberForm({
         position_ids: [roleId],
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save member')
+      setError(err instanceof Error ? err.message : t.seedFailed)
     } finally {
       setLoading(false)
     }
+  }
+
+  const roleMessages = {
+    siteRole: t.siteRole,
+    selectRole: t.selectRole,
+    noPositions: t.noPositions,
+    seedPositions: t.seedPositions,
+    seedingPositions: t.seedingPositions,
+    loadingPositions: t.loadingPositions,
   }
 
   return (
@@ -77,7 +111,7 @@ export function MemberForm({
           </div>
           <div>
             <CardTitle className="text-base">{submitLabel}</CardTitle>
-            <CardDescription>Add a new team member with role and login credentials.</CardDescription>
+            <CardDescription>{t.memberManagementDesc}</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -85,18 +119,17 @@ export function MemberForm({
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="member-name">Full Name</Label>
+              <Label htmlFor="member-name">{t.fullName}</Label>
               <Input
                 id="member-name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
                 className="h-11"
-                placeholder="Ahmad Rezaei"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="member-email">Username</Label>
+              <Label htmlFor="member-email">{t.username}</Label>
               <Input
                 id="member-email"
                 type="text"
@@ -105,11 +138,9 @@ export function MemberForm({
                 required
                 disabled={Boolean(initial)}
                 className="h-11"
-                placeholder="sahar"
+                placeholder="member.username"
               />
-              <p className="text-xs text-muted-foreground">
-                Plain username only — no @ needed. Example: sahar
-              </p>
+              <p className="text-xs text-muted-foreground">{t.usernameHint}</p>
             </div>
           </div>
 
@@ -117,11 +148,16 @@ export function MemberForm({
             positions={positions}
             value={roleId}
             onChange={setRoleId}
+            loading={positionsLoading}
+            seeding={seeding}
+            seedMessage={seedMessage}
+            onSeed={onSeedPositions ? handleSeed : undefined}
+            messages={roleMessages}
           />
 
           {showPasswordField ? (
             <div className="space-y-2">
-              <Label htmlFor="member-password">Initial Password</Label>
+              <Label htmlFor="member-password">{t.initialPassword}</Label>
               <Input
                 id="member-password"
                 type="text"
@@ -130,29 +166,25 @@ export function MemberForm({
                 required
                 minLength={6}
                 className="h-11 font-mono"
-                placeholder="Set login password"
               />
-              <p className="text-xs text-muted-foreground">
-                Admin can view this password. Member must change it on first login.
-              </p>
+              <p className="text-xs text-muted-foreground">{t.passwordHint}</p>
             </div>
           ) : null}
 
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="member-phone">Phone (optional)</Label>
+              <Label htmlFor="member-phone">{t.phoneOptional}</Label>
               <Input
                 id="member-phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="h-11"
-                placeholder="+98 ..."
               />
             </div>
             <div className="flex items-end pb-1">
               <Checkbox
                 id="member-active"
-                label="Active member"
+                label={t.activeMember}
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
               />
@@ -163,8 +195,12 @@ export function MemberForm({
             <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>
           ) : null}
 
-          <Button type="submit" disabled={loading || positions.filter((p) => p.is_active).length === 0} className="h-11">
-            {loading ? 'Saving...' : submitLabel}
+          <Button
+            type="submit"
+            disabled={loading || seeding || (!positionsLoading && positions.filter((p) => p.is_active).length === 0)}
+            className="h-11"
+          >
+            {loading ? t.saving : submitLabel}
           </Button>
         </form>
       </CardContent>

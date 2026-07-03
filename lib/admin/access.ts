@@ -1,26 +1,23 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { SystemRole } from '@/types/admin'
+import { ADMIN_EMAIL } from '@/lib/admin/defaults'
 
-const ADMIN_ROLE_KEYS = ['system_admin', 'it_admin'] as const
+/** Only mojtaba421@gmail.com has full platform admin access. */
+export async function isSystemAdmin(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error || !data?.email) return false
+  return data.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()
+}
 
 function normalizeRole(row: { system_role: unknown }) {
   const value = row.system_role
   if (Array.isArray(value)) return value[0] as { key: string; is_active: boolean } | undefined
   return value as { key: string; is_active: boolean } | null
-}
-
-export async function isSystemAdmin(supabase: SupabaseClient, userId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('user_system_roles')
-    .select('system_role:system_roles(key, is_active)')
-    .eq('user_id', userId)
-
-  if (error) return false
-
-  return (data ?? []).some((row) => {
-    const role = normalizeRole(row)
-    return role?.is_active && ADMIN_ROLE_KEYS.includes(role.key as (typeof ADMIN_ROLE_KEYS)[number])
-  })
 }
 
 export async function getUserSystemRoles(

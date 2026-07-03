@@ -12,4 +12,20 @@ export function readLocaleCookie(): FormLocale {
 export function writeLocaleCookie(locale: FormLocale) {
   const maxAge = 60 * 60 * 24 * 365
   document.cookie = `${LOCALE_COOKIE}=${encodeURIComponent(locale)};path=/;max-age=${maxAge};SameSite=Lax`
+  try {
+    localStorage.setItem(LOCALE_COOKIE, locale)
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
+export function readStoredLocale(): FormLocale | undefined {
+  if (typeof window === 'undefined') return undefined
+  try {
+    const fromStorage = localStorage.getItem(LOCALE_COOKIE)
+    if (fromStorage) return normalizeLocale(fromStorage)
+  } catch {
+    /* ignore */
+  }
+  return readLocaleCookie()
 }

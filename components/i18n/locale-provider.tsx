@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { APP_SHELL } from '@/lib/i18n/app-shell'
-import { LOCALE_COOKIE, readLocaleCookie, writeLocaleCookie } from '@/lib/i18n/locale-cookie'
+import { LOCALE_COOKIE, readLocaleCookie, readStoredLocale, writeLocaleCookie } from '@/lib/i18n/locale-cookie'
 import type { FormLocale } from '@/lib/project-init/i18n/types'
 import { isRtlLocale, normalizeLocale } from '@/lib/project-init/i18n/utils'
 
@@ -25,7 +25,7 @@ export function LocaleProvider({
 }) {
   const router = useRouter()
   const [locale, setLocaleState] = useState<FormLocale>(() =>
-    normalizeLocale(initialLocale ?? (typeof window !== 'undefined' ? readLocaleCookie() : undefined))
+    normalizeLocale(initialLocale ?? (typeof window !== 'undefined' ? readStoredLocale() : undefined))
   )
 
   const dir = isRtlLocale(locale) ? 'rtl' : 'ltr'
@@ -42,9 +42,9 @@ export function LocaleProvider({
   )
 
   useEffect(() => {
-    const fromCookie = readLocaleCookie()
-    if (fromCookie !== locale) {
-      setLocaleState(fromCookie)
+    const stored = readStoredLocale()
+    if (stored && stored !== locale) {
+      setLocaleState(stored)
     }
     document.documentElement.lang = locale
     document.documentElement.dir = dir

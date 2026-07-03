@@ -100,20 +100,30 @@ export async function createProject(
   return data as AdminProject
 }
 
-async function seedDefaultPositions(supabase: SupabaseClient, projectId: string) {
-  const { error } = await supabase.from('positions').insert(
-    DEFAULT_SITE_POSITIONS.map((position) => ({
-      project_id: projectId,
-      title: position.title,
-      key: position.key,
-      description: position.description,
-      is_active: true,
-    }))
-  )
+async function seedDefaultPositions(supabase: SupabaseClient, projectId: string): Promise<number> {
+  return seedProjectPositions(supabase, projectId)
+}
 
-  if (error && !error.message.includes('duplicate')) {
-    throw new Error(error.message)
+/** Idempotent seed of 22 default construction site positions for a project. */
+export async function seedProjectPositions(
+  supabase: SupabaseClient,
+  projectId: string
+): Promise<number> {
+  const { getSeedPositionRows } = await import('@/lib/i18n/position-labels')
+  const rows = getSeedPositionRows(projectId)
+
+  const { error } = await supabase.from('positions').insert(rows)
+
+  if (error && !error.message.includes('duplicate') && !error.message.includes('unique')) {
+    const fallbackRows = rows.map(({ name_en, name_fa, name_fr, name_de, ...rest }) => rest)
+    const { error: fallbackError } = await supabase.from('positions').insert(fallbackRows)
+    if (fallbackError && !fallbackError.message.includes('duplicate') && !fallbackError.message.includes('unique')) {
+      throw new Error(fallbackError.message)
+    }
   }
+
+  const positions = await fetchPositions(supabase, projectId)
+  return positions.length
 }
 
 export async function updateProject(

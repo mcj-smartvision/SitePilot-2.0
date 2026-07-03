@@ -9,6 +9,7 @@ export interface AppShellMessages {
   language: string
   login: string
   email: string
+  username: string
   password: string
   signIn: string
   forgotPassword: string
@@ -24,6 +25,7 @@ export const APP_SHELL: Record<FormLocale, AppShellMessages> = {
     language: 'Language',
     login: 'Sign in',
     email: 'Email',
+    username: 'Username',
     password: 'Password',
     signIn: 'Sign in',
     forgotPassword: 'Forgot password?',
@@ -37,6 +39,7 @@ export const APP_SHELL: Record<FormLocale, AppShellMessages> = {
     language: 'Sprache',
     login: 'Anmelden',
     email: 'E-Mail',
+    username: 'Benutzername',
     password: 'Passwort',
     signIn: 'Anmelden',
     forgotPassword: 'Passwort vergessen?',
@@ -50,6 +53,7 @@ export const APP_SHELL: Record<FormLocale, AppShellMessages> = {
     language: 'Langue',
     login: 'Connexion',
     email: 'E-mail',
+    username: "Nom d'utilisateur",
     password: 'Mot de passe',
     signIn: 'Se connecter',
     forgotPassword: 'Mot de passe oublié ?',
@@ -63,6 +67,7 @@ export const APP_SHELL: Record<FormLocale, AppShellMessages> = {
     language: 'اللغة',
     login: 'تسجيل الدخول',
     email: 'البريد الإلكتروني',
+    username: 'اسم المستخدم',
     password: 'كلمة المرور',
     signIn: 'دخول',
     forgotPassword: 'نسيت كلمة المرور؟',
@@ -76,6 +81,7 @@ export const APP_SHELL: Record<FormLocale, AppShellMessages> = {
     language: 'زبان',
     login: 'ورود',
     email: 'ایمیل',
+    username: 'نام کاربری',
     password: 'رمز عبور',
     signIn: 'ورود',
     forgotPassword: 'فراموشی رمز؟',

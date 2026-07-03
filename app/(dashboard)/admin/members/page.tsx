@@ -1,13 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSupabase } from '@/hooks/useSupabase'
-import {
-  fetchAdminProjects,
-  fetchAllMembers,
-  fetchPositions,
-} from '@/utils/admin'
+import { fetchAdminProjects, fetchAllMembers, fetchPositions } from '@/utils/admin'
 import { PageHeader, LoadingBlock, ErrorBlock, StatusBadge } from '@/components/admin/shared'
 import { MemberForm } from '@/components/admin/member-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,17 +18,42 @@ import {
 } from '@/components/ui/select'
 import type { AdminProject, Position, ProjectMember } from '@/types/admin'
 import { formatLoginDisplay } from '@/lib/auth/login-identifier'
+import { getAdminMemberMessages } from '@/lib/i18n/admin-member'
+import { useLocale } from '@/components/i18n/locale-provider'
 import { KeyRound, Pencil, ShieldAlert, UserCheck, Users } from 'lucide-react'
 
 export default function AdminMembersPage() {
   const supabase = useSupabase()
+  const { locale } = useLocale()
+  const t = getAdminMemberMessages(locale)
   const [members, setMembers] = useState<ProjectMember[]>([])
   const [projects, setProjects] = useState<AdminProject[]>([])
   const [positions, setPositions] = useState<Position[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [positionsLoading, setPositionsLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const loadPositions = useCallback(
+    async (projectId: string) => {
+      if (!projectId) {
+        setPositions([])
+        return
+      }
+      setPositionsLoading(true)
+      try {
+        const data = await fetchPositions(supabase, projectId)
+        setPositions(data)
+      } catch (err) {
+        console.error(err)
+        setPositions([])
+      } finally {
+        setPositionsLoading(false)
+      }
+    },
+    [supabase]
+  )
 
   async function loadData(projectId?: string) {
     const [memberData, projectData] = await Promise.all([
@@ -43,11 +64,9 @@ export default function AdminMembersPage() {
     setProjects(projectData)
 
     const pid = projectId ?? selectedProjectId ?? projectData[0]?.id ?? ''
-    if (pid && pid !== selectedProjectId) setSelectedProjectId(pid)
-
     if (pid) {
-      const positionData = await fetchPositions(supabase, pid)
-      setPositions(positionData)
+      setSelectedProjectId(pid)
+      await loadPositions(pid)
     }
   }
 
@@ -70,8 +89,20 @@ export default function AdminMembersPage() {
 
   useEffect(() => {
     if (!selectedProjectId) return
-    fetchPositions(supabase, selectedProjectId).then(setPositions).catch(console.error)
-  }, [selectedProjectId, supabase])
+    loadPositions(selectedProjectId)
+  }, [selectedProjectId, loadPositions])
+
+  async function handleSeedPositions() {
+    if (!selectedProjectId) return
+    const response = await fetch('/api/admin/seed-positions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: selectedProjectId }),
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || t.seedFailed)
+    setPositions(data.positions ?? [])
+  }
 
   async function handleCreateMember(values: {
     full_name: string
@@ -81,7 +112,7 @@ export default function AdminMembersPage() {
     is_active?: boolean
     position_ids: string[]
   }) {
-    if (!selectedProjectId) throw new Error('Select a project first')
+    if (!selectedProjectId) throw new Error(t.selectProject)
 
     const response = await fetch('/api/admin/invite-member', {
       method: 'POST',
@@ -98,7 +129,7 @@ export default function AdminMembersPage() {
     setShowForm(false)
   }
 
-  if (loading) return <LoadingBlock label="Loading members..." />
+  if (loading) return <LoadingBlock label={t.loadingPositions} />
   if (error) return <ErrorBlock message={error} onRetry={() => window.location.reload()} />
 
   const activeCount = members.filter((m) => m.is_active).length
@@ -107,11 +138,11 @@ export default function AdminMembersPage() {
   return (
     <div className="space-y-6 max-w-[1400px]">
       <PageHeader
-        title="Member Management"
-        description="Add, edit, and monitor all site team members across projects."
+        title={t.memberManagement}
+        description={t.memberManagementDesc}
         actions={
           <Button onClick={() => setShowForm(!showForm)} disabled={!selectedProjectId && projects.length === 0}>
-            {showForm ? 'Cancel' : 'Add Member'}
+            {showForm ? t.cancel : t.addMember}
           </Button>
         }
       />
@@ -124,7 +155,7 @@ export default function AdminMembersPage() {
             </div>
             <div>
               <p className="text-2xl font-bold">{members.length}</p>
-              <p className="text-xs text-muted-foreground">Total members</p>
+              <p className="text-xs text-muted-foreground">{t.totalMembers}</p>
             </div>
           </CardContent>
         </Card>
@@ -135,7 +166,7 @@ export default function AdminMembersPage() {
             </div>
             <div>
               <p className="text-2xl font-bold">{activeCount}</p>
-              <p className="text-xs text-muted-foreground">Active members</p>
+              <p className="text-xs text-muted-foreground">{t.activeMembers}</p>
             </div>
           </CardContent>
         </Card>
@@ -146,7 +177,7 @@ export default function AdminMembersPage() {
             </div>
             <div>
               <p className="text-2xl font-bold">{pendingPassword}</p>
-              <p className="text-xs text-muted-foreground">Password change pending</p>
+              <p className="text-xs text-muted-foreground">{t.passwordPending}</p>
             </div>
           </CardContent>
         </Card>
@@ -154,10 +185,10 @@ export default function AdminMembersPage() {
 
       {projects.length > 0 ? (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm font-medium">Project:</span>
+          <span className="text-sm font-medium">{t.project}:</span>
           <Select value={selectedProjectId || undefined} onValueChange={setSelectedProjectId}>
             <SelectTrigger className="w-[240px]">
-              <SelectValue placeholder="Select project" />
+              <SelectValue placeholder={t.selectProject} />
             </SelectTrigger>
             <SelectContent position="popper" sideOffset={4}>
               {projects.map((p) => (
@@ -169,9 +200,9 @@ export default function AdminMembersPage() {
       ) : (
         <Card className="border-dashed">
           <CardContent className="py-8 text-center">
-            <p className="text-muted-foreground text-sm">Create a project first to add members.</p>
+            <p className="text-muted-foreground text-sm">{t.createProjectFirst}</p>
             <Button asChild className="mt-4" size="sm">
-              <Link href="/admin/projects">Create Project</Link>
+              <Link href="/admin/projects">{t.createProject}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -180,29 +211,30 @@ export default function AdminMembersPage() {
       {showForm && selectedProjectId ? (
         <MemberForm
           positions={positions}
-          submitLabel="Add Member"
+          positionsLoading={positionsLoading}
+          onSeedPositions={handleSeedPositions}
+          submitLabel={t.addMember}
           onSubmit={handleCreateMember}
         />
       ) : null}
 
       <Card className="shadow-card overflow-hidden">
         <CardHeader className="border-b bg-muted/20 pb-4">
-          <CardTitle className="text-base font-semibold">Team Directory</CardTitle>
+          <CardTitle className="text-base font-semibold">{t.teamDirectory}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {members.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">No members yet.</div>
+            <div className="p-8 text-center text-sm text-muted-foreground">{t.noMembers}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/30">
-                    <th className="text-left font-medium text-muted-foreground px-4 py-3">Name</th>
-                    <th className="text-left font-medium text-muted-foreground px-4 py-3">Role</th>
-                    <th className="text-left font-medium text-muted-foreground px-4 py-3">Email / Username</th>
-                    <th className="text-left font-medium text-muted-foreground px-4 py-3">Password</th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-3">{t.fullName}</th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-3">{t.siteRole}</th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-3">{t.username}</th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-3">{t.initialPassword}</th>
                     <th className="text-left font-medium text-muted-foreground px-4 py-3">Status</th>
-                    <th className="text-left font-medium text-muted-foreground px-4 py-3">First Login</th>
                     <th className="text-right font-medium text-muted-foreground px-4 py-3">Actions</th>
                   </tr>
                 </thead>
@@ -211,7 +243,6 @@ export default function AdminMembersPage() {
                     <tr key={member.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3.5">
                         <p className="font-medium">{member.full_name}</p>
-                        {member.phone ? <p className="text-xs text-muted-foreground">{member.phone}</p> : null}
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex flex-wrap gap-1">
@@ -230,17 +261,6 @@ export default function AdminMembersPage() {
                       </td>
                       <td className="px-4 py-3.5">
                         <StatusBadge active={member.is_active} />
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {member.password_changed_by_member ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
-                            <UserCheck className="h-3.5 w-3.5" /> Changed
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs text-amber-600">
-                            <ShieldAlert className="h-3.5 w-3.5" /> Required
-                          </span>
-                        )}
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <Button asChild variant="ghost" size="sm">
