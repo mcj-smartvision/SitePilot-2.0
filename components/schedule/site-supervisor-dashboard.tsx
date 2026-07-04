@@ -130,7 +130,7 @@ export function SiteSupervisorDashboard({
         <CardContent className="p-0">
           {tasks.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
-              No schedule tasks yet. Import an MSP XML file from Admin → Projects (coming soon).
+              No schedule tasks yet. Ask admin to import MSP XML under Admin → Projects → Schedule.
             </div>
           ) : (
             <div className="divide-y">
