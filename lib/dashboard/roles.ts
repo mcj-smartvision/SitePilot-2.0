@@ -3,6 +3,7 @@ export const SITE_ROLES = {
   PROJECT_MANAGER: 'project_manager',
   SITE_SUPERVISOR: 'site_supervisor',
   STOREKEEPER: 'storekeeper',
+  PROCUREMENT: 'procurement_officer',
   SECURITY: 'security',
   CLIENT: 'client',
 } as const
@@ -13,6 +14,7 @@ export const SITE_ROLE_LABELS: Record<SiteRoleKey, string> = {
   project_manager: 'Project Manager',
   site_supervisor: 'Site Supervisor',
   storekeeper: 'Storekeeper',
+  procurement_officer: 'Procurement',
   security: 'Security',
   client: 'Client',
 }
@@ -21,6 +23,7 @@ export const SITE_ROLE_LABELS: Record<SiteRoleKey, string> = {
 export const ROLE_PRIORITY: SiteRoleKey[] = [
   SITE_ROLES.PROJECT_MANAGER,
   SITE_ROLES.SITE_SUPERVISOR,
+  SITE_ROLES.PROCUREMENT,
   SITE_ROLES.STOREKEEPER,
   SITE_ROLES.SECURITY,
   SITE_ROLES.CLIENT,
@@ -48,6 +51,7 @@ export const ROLE_WIDGET_KEYS: Record<SiteRoleKey, string[]> = {
     'overview.stats',
   ],
   storekeeper: ['inventory.stock', 'overview.stats'],
+  procurement_officer: ['schedule.overview', 'overview.stats'],
   security: ['security.entry_exit', 'security.alerts', 'overview.stats'],
   client: ['progress.overview', 'financial.overview', 'reports.recent'],
 }

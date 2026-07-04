@@ -1,0 +1,65 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { isSystemAdmin } from '@/lib/admin/access'
+import { importMspScheduleToProject } from '@/lib/schedule/msp-import'
+
+/**
+ * POST /api/schedule/import-msp
+ * multipart/form-data: project_id, file (MSP XML)
+ *
+ * Parses MSP XML and stores tasks + dependencies in Supabase.
+ * Real XML parsing is stubbed in lib/schedule/msp-import.ts for now.
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const admin = await isSystemAdmin(supabase, user.id)
+    const formData = await request.formData()
+    const projectId = String(formData.get('project_id') ?? '')
+    const file = formData.get('file')
+
+    if (!projectId) {
+      return NextResponse.json({ error: 'project_id is required' }, { status: 400 })
+    }
+
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: 'MSP XML file is required' }, { status: 400 })
+    }
+
+    if (!admin) {
+      const { data: member } = await supabase
+        .from('project_members')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (!member) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    }
+
+    const xmlContent = await file.text()
+    const result = await importMspScheduleToProject(
+      supabase,
+      projectId,
+      file.name,
+      xmlContent,
+      user.id
+    )
+
+    return NextResponse.json(result)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'MSP import failed'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}

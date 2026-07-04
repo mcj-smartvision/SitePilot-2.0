@@ -6,30 +6,35 @@ import { LogoutButton } from '@/components/auth/logout-button'
 import { HeaderLanguageSwitcher } from '@/components/i18n/header-language-switcher'
 import { HeaderProjectSwitcher } from '@/components/project/header-project-switcher'
 import { useLocale } from '@/components/i18n/locale-provider'
+import type { RoleNavLink } from '@/lib/dashboard/role-nav'
 import { HardHat } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface DashboardHeaderProps {
   email: string
   isAdmin: boolean
+  roleNavLinks?: RoleNavLink[]
 }
 
-export function DashboardHeader({ email, isAdmin }: DashboardHeaderProps) {
+export function DashboardHeader({ email, isAdmin, roleNavLinks = [] }: DashboardHeaderProps) {
   const { app } = useLocale()
   const pathname = usePathname()
 
-  const navItems = isAdmin
+  const baseNav = isAdmin
     ? [
         { href: '/admin', label: 'Control Center' },
         { href: '/admin/members', label: 'Members' },
         { href: '/admin/projects', label: 'Projects' },
-        { href: '/settings', label: app.settings },
       ]
-    : [
-        { href: '/dashboard', label: 'Dashboard' },
-        { href: '/reports', label: app.reports },
-        { href: '/settings', label: app.settings },
-      ]
+    : [{ href: '/dashboard', label: 'Dashboard' }]
+
+  const roleNav = roleNavLinks.map((link) => ({ href: link.href, label: link.label }))
+  const tailNav = [
+    { href: '/reports', label: app.reports },
+    { href: '/settings', label: app.settings },
+  ]
+
+  const navItems = isAdmin ? [...baseNav, ...tailNav] : [...baseNav, ...roleNav, ...tailNav]
 
   return (
     <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 shadow-sm">
