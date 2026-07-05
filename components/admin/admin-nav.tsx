@@ -14,6 +14,7 @@ import {
 import { cn } from '@/lib/utils'
 import { LogoutButton } from '@/components/auth/logout-button'
 import { HeaderLanguageSwitcher } from '@/components/i18n/header-language-switcher'
+import { HeaderCalendarSwitcher } from '@/components/schedule/header-calendar-switcher'
 import { HeaderProjectSwitcher } from '@/components/project/header-project-switcher'
 
 const NAV_ITEMS = [
@@ -37,6 +38,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
             <p className="font-bold text-sm leading-tight">SitePilot</p>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Operations</p>
           </div>
+          <HeaderCalendarSwitcher className="shrink-0 hidden xl:block" />
           <HeaderLanguageSwitcher className="shrink-0" />
         </div>
 
@@ -88,6 +90,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
           </div>
           <div className="flex items-center gap-2">
             <HeaderProjectSwitcher />
+            <HeaderCalendarSwitcher />
             <HeaderLanguageSwitcher />
             <LogoutButton label="Out" />
           </div>

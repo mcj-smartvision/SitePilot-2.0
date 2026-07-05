@@ -7,6 +7,7 @@ import { fetchReportsArchive } from '@/utils/reports'
 import type { ReportWithAnalysis } from '@/types'
 import type { WidgetRenderContext } from '@/types/dashboard'
 import { WidgetShell } from '@/components/widgets/widget-shell'
+import { FormattedDate } from '@/components/schedule/formatted-date'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export function ReportWidget({ context }: { context: WidgetRenderContext }) {
@@ -43,7 +44,7 @@ export function ReportWidget({ context }: { context: WidgetRenderContext }) {
             <li key={report.id} className="rounded-md border px-3 py-2 text-sm">
               <p className="font-medium">{report.activity_type ?? 'Site report'}</p>
               <p className="text-xs text-muted-foreground">
-                {new Date(report.created_at).toLocaleString()} · workforce {report.workforce_count ?? '—'}
+                <FormattedDate value={report.created_at} dateTime /> · workforce {report.workforce_count ?? '—'}
               </p>
             </li>
           ))}

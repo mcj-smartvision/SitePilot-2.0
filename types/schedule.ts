@@ -22,6 +22,8 @@ export interface ProjectTask {
   finish_planned: string | null
   start_current: string | null
   finish_current: string | null
+  baseline_start: string | null
+  baseline_finish: string | null
   percent_complete: number
   is_critical: boolean
   created_at: string

@@ -16,6 +16,7 @@ import {
   Warehouse,
 } from 'lucide-react'
 import { useLocale } from '@/components/i18n/locale-provider'
+import { FormattedDate } from '@/components/schedule/formatted-date'
 import { PageHeader, LoadingBlock, ErrorBlock, SectionCard } from '@/components/admin/shared'
 import { StatCard } from '@/components/admin/stat-card'
 import { Button } from '@/components/ui/button'
@@ -419,7 +420,7 @@ export function StorekeeperDashboard({
                       <td className="py-2.5 px-2">{tx.quantity}</td>
                       <td className="py-2.5 px-2">{tx.unit}</td>
                       <td className="py-2.5 px-2 whitespace-nowrap">
-                        {new Date(tx.date).toLocaleString(locale === 'fa' ? 'fa-IR' : 'en-GB')}
+                        <FormattedDate value={tx.date} dateTime />
                       </td>
                     </tr>
                   ))}

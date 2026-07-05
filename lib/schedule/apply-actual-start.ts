@@ -1,12 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
-  addDaysIso,
   computeBaselineStartFromTasks,
   diffDaysIso,
-  shiftIsoTimestamp,
   toIsoDateOnly,
 } from '@/lib/schedule/dates'
-import type { ProjectTask } from '@/types/schedule'
+import { rebuildScheduleFromProjectStart } from '@/lib/schedule/reschedule-engine'
+import type { ProjectTask, TaskDependency } from '@/types/schedule'
 
 export interface ApplyActualStartInput {
   projectId: string
@@ -23,6 +22,13 @@ export interface ScheduleStartAnalysis {
   tasks_completed: number
   tasks_delayed: number
   overall_percent: number
+  rebuilt_from_dependencies: boolean
+}
+
+export interface ApplyActualStartResult {
+  analysis: ScheduleStartAnalysis
+  tasks: ProjectTask[]
+  actual_start: string
 }
 
 export async function fetchProjectScheduleMeta(
@@ -56,28 +62,36 @@ export async function fetchProjectScheduleMeta(
 export async function applyActualStartToSchedule(
   supabase: SupabaseClient,
   input: ApplyActualStartInput
-): Promise<ScheduleStartAnalysis> {
+): Promise<ApplyActualStartResult> {
   const { projectId, actualStartDate, alignedWithBaseline } = input
 
-  const { data: tasks, error: tasksError } = await supabase
-    .from('project_tasks')
-    .select('*')
-    .eq('project_id', projectId)
+  const [{ data: tasks, error: tasksError }, { data: deps, error: depsError }, { data: projectRow }] =
+    await Promise.all([
+      supabase.from('project_tasks').select('*').eq('project_id', projectId),
+      supabase.from('task_dependencies').select('*').eq('project_id', projectId),
+      supabase.from('projects').select('schedule_baseline_start').eq('id', projectId).maybeSingle(),
+    ])
 
   if (tasksError) throw new Error(tasksError.message)
+  if (depsError && depsError.code !== '42P01') throw new Error(depsError.message)
+
   const rows = (tasks ?? []) as ProjectTask[]
+  const dependencies = (deps ?? []) as TaskDependency[]
 
   if (rows.length === 0) {
     throw new Error('No tasks found — import MSP XML first')
   }
 
   const baselineStart =
+    toIsoDateOnly(projectRow?.schedule_baseline_start) ??
     computeBaselineStartFromTasks(rows) ??
     toIsoDateOnly(rows[0].start_planned) ??
     actualStartDate
 
   const actualStart = alignedWithBaseline ? baselineStart : actualStartDate
   const shiftDays = diffDaysIso(baselineStart, actualStart)
+
+  const rebuilt = rebuildScheduleFromProjectStart(actualStart, rows, dependencies, baselineStart)
 
   const today = new Date().toISOString().slice(0, 10)
   let tasksInProgress = 0
@@ -89,14 +103,17 @@ export async function applyActualStartToSchedule(
     const pct = Number(task.percent_complete)
     percentSum += pct
 
-    const startCurrent = shiftIsoTimestamp(task.start_planned, shiftDays)
-    const finishCurrent = shiftIsoTimestamp(task.finish_planned, shiftDays)
+    const dates = rebuilt.taskDates.get(task.id)
+    if (!dates) continue
 
     const { error: updateError } = await supabase
       .from('project_tasks')
       .update({
-        start_current: startCurrent,
-        finish_current: finishCurrent,
+        start_planned: dates.start,
+        finish_planned: dates.finish,
+        start_current: dates.start,
+        finish_current: dates.finish,
+        updated_at: new Date().toISOString(),
       })
       .eq('id', task.id)
 
@@ -105,7 +122,7 @@ export async function applyActualStartToSchedule(
     if (pct >= 100) tasksCompleted++
     else if (pct > 0) tasksInProgress++
 
-    const finishIso = toIsoDateOnly(finishCurrent)
+    const finishIso = toIsoDateOnly(dates.finish)
     if (pct < 100 && finishIso && finishIso < today) tasksDelayed++
   }
 
@@ -125,7 +142,15 @@ export async function applyActualStartToSchedule(
     throw new Error(projectError.message)
   }
 
-  return {
+  const { data: updatedTasks, error: refetchError } = await supabase
+    .from('project_tasks')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('start_planned', { ascending: true })
+
+  if (refetchError) throw new Error(refetchError.message)
+
+  const analysis: ScheduleStartAnalysis = {
     baseline_start: baselineStart,
     actual_start: actualStart,
     shift_days: shiftDays,
@@ -134,6 +159,13 @@ export async function applyActualStartToSchedule(
     tasks_completed: tasksCompleted,
     tasks_delayed: tasksDelayed,
     overall_percent: rows.length ? Math.round(percentSum / rows.length) : 0,
+    rebuilt_from_dependencies: dependencies.length > 0,
+  }
+
+  return {
+    analysis,
+    tasks: (updatedTasks ?? []) as ProjectTask[],
+    actual_start: actualStart,
   }
 }
 
@@ -151,14 +183,4 @@ export async function setScheduleBaselineAfterImport(
 
   const { error } = await supabase.from('projects').update(payload).eq('id', projectId)
   if (error && error.code !== '42703') throw new Error(error.message)
-}
-
-export function previewShiftDays(baselineStart: string, actualStart: string): number {
-  return diffDaysIso(baselineStart, actualStart)
-}
-
-export function previewActualFinish(plannedFinish: string | null, shiftDays: number): string | null {
-  const iso = toIsoDateOnly(plannedFinish)
-  if (!iso) return null
-  return addDaysIso(iso, shiftDays)
 }

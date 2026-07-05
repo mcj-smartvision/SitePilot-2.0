@@ -3,6 +3,7 @@ import type { MspImportResult, ProjectTask, ScheduleImport } from '@/types/sched
 import { parseMspXml } from '@/lib/schedule/msp-parser'
 import { computeBaselineStartFromTasks } from '@/lib/schedule/dates'
 import { setScheduleBaselineAfterImport } from '@/lib/schedule/apply-actual-start'
+import { compareWbs } from '@/lib/schedule/wbs-utils'
 
 export interface MspParsedTask {
   msp_uid: number
@@ -69,6 +70,8 @@ export async function importMspScheduleToProject(
             name: task.name,
             start_planned: task.start_planned,
             finish_planned: task.finish_planned,
+            baseline_start: task.start_planned,
+            baseline_finish: task.finish_planned,
             start_current: task.start_planned,
             finish_current: task.finish_planned,
             percent_complete: task.percent_complete,
@@ -171,13 +174,14 @@ export async function fetchProjectTasksSummary(
     .from('project_tasks')
     .select('*', { count: 'exact' })
     .eq('project_id', projectId)
-    .order('start_current', { ascending: true, nullsFirst: false })
-    .limit(50)
+    .limit(500)
 
   if (error) {
     if (error.code === '42P01') return { count: 0, tasks: [] }
     throw new Error(error.message)
   }
 
-  return { count: count ?? 0, tasks: (data ?? []) as ProjectTask[] }
+  const tasks = ((data ?? []) as ProjectTask[]).sort((a, b) => compareWbs(a.wbs_code, b.wbs_code))
+
+  return { count: count ?? 0, tasks }
 }

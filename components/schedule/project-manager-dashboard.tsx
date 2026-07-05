@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader, EmptyState } from '@/components/admin/shared'
 import { ScheduleDateToolbar } from '@/components/schedule/schedule-date-toolbar'
+import { FormattedDate } from '@/components/schedule/formatted-date'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -163,7 +164,7 @@ export function ProjectManagerDashboard({
               <div key={report.id} className="rounded-lg border p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="font-medium">{report.report_date}</p>
+                    <p className="font-medium"><FormattedDate value={report.report_date} /></p>
                     <p className="text-xs text-muted-foreground line-clamp-2">{report.raw_text}</p>
                   </div>
                   {report.approved_by_manager ? (

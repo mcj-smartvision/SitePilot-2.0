@@ -3,21 +3,23 @@ import { PageHeader } from '@/components/admin/shared'
 import { ScheduleImportPanel } from '@/components/admin/schedule-import-panel'
 import { fetchProjectTasksSummary, fetchScheduleImports } from '@/lib/schedule/msp-import'
 import { fetchProjectScheduleMeta } from '@/lib/schedule/apply-actual-start'
+import { fetchTaskPredecessorLabels } from '@/lib/schedule/predecessor-labels'
 
 export default async function ProjectSchedulePage({ params }: { params: { projectId: string } }) {
   const supabase = createClient()
 
-  const [imports, taskSummary, scheduleMeta] = await Promise.all([
+  const [imports, taskSummary, scheduleMeta, predecessorLabels] = await Promise.all([
     fetchScheduleImports(supabase, params.projectId),
     fetchProjectTasksSummary(supabase, params.projectId),
     fetchProjectScheduleMeta(supabase, params.projectId),
+    fetchTaskPredecessorLabels(supabase, params.projectId),
   ])
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 max-w-6xl">
       <PageHeader
         title="Schedule"
-        description="Import MSP XML, confirm actual project start, and view tasks in Gregorian or Shamsi calendar."
+        description="Import MSP XML, confirm project start, and view tasks in the selected calendar."
       />
 
       <ScheduleImportPanel
@@ -27,6 +29,7 @@ export default async function ProjectSchedulePage({ params }: { params: { projec
         previewTasks={taskSummary.tasks}
         scheduleBaselineStart={scheduleMeta.schedule_baseline_start}
         scheduleActualStart={scheduleMeta.schedule_actual_start}
+        predecessorLabels={predecessorLabels}
       />
     </div>
   )

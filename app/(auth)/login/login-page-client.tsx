@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { HardHat, Lock, User, ArrowRight } from 'lucide-react'
 import { normalizeLoginIdentifier } from '@/lib/auth/login-identifier'
 import { HeaderLanguageSwitcher } from '@/components/i18n/header-language-switcher'
+import { HeaderCalendarSwitcher } from '@/components/schedule/header-calendar-switcher'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -60,7 +61,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 industrial-gradient relative">
       <div className="absolute inset-0 site-grid-bg opacity-10 pointer-events-none" />
-      <div className="absolute top-4 end-4 z-10">
+      <div className="absolute top-4 end-4 z-10 flex flex-wrap items-center justify-end gap-2">
+        <HeaderCalendarSwitcher />
         <HeaderLanguageSwitcher />
       </div>
 

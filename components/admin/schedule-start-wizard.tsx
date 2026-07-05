@@ -1,14 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { CalendarSystemToggle } from '@/components/schedule/calendar-system-toggle'
-import { formatScheduleDate, diffDaysIso } from '@/lib/schedule/dates'
-import { useScheduleCalendar } from '@/hooks/useScheduleCalendar'
+import { ScheduleDateInput } from '@/components/schedule/schedule-date-input'
+import { FormattedDate } from '@/components/schedule/formatted-date'
+import { diffDaysIso } from '@/lib/schedule/dates'
 import type { ScheduleStartAnalysis } from '@/lib/schedule/apply-actual-start'
 import { useLocale } from '@/components/i18n/locale-provider'
 import { CheckCircle2, Loader2, CalendarClock } from 'lucide-react'
@@ -22,7 +20,6 @@ interface ScheduleStartWizardProps {
 export function ScheduleStartWizard({ projectId, baselineStart, onComplete }: ScheduleStartWizardProps) {
   const router = useRouter()
   const { locale } = useLocale()
-  const { calendar } = useScheduleCalendar()
   const fa = locale === 'fa'
 
   const [step, setStep] = useState<'question' | 'date' | 'done'>('question')
@@ -30,6 +27,10 @@ export function ScheduleStartWizard({ projectId, baselineStart, onComplete }: Sc
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<ScheduleStartAnalysis | null>(null)
+
+  useEffect(() => {
+    setActualStart(baselineStart)
+  }, [baselineStart])
 
   async function submit(aligned: boolean) {
     setLoading(true)
@@ -51,7 +52,6 @@ export function ScheduleStartWizard({ projectId, baselineStart, onComplete }: Sc
 
       setAnalysis(data.analysis)
       setStep('done')
-      router.refresh()
       onComplete?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed')
@@ -60,32 +60,30 @@ export function ScheduleStartWizard({ projectId, baselineStart, onComplete }: Sc
     }
   }
 
-  const shiftPreview =
+  const dayDelta =
     step === 'date' && actualStart ? diffDaysIso(baselineStart, actualStart) : 0
 
   return (
     <Card className="border-primary/30 shadow-card">
       <CardHeader className="border-b bg-primary/5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-base flex items-center gap-2">
-              <CalendarClock className="h-4 w-4" />
-              {fa ? 'تأیید تاریخ شروع پروژه' : 'Confirm project start date'}
-            </CardTitle>
-            <CardDescription className="mt-1">
-              {fa
-                ? 'پس از import، تاریخ شروع واقعی را مشخص کنید تا برنامه به‌روز شود.'
-                : 'After import, set the actual start so the schedule shifts correctly.'}
-            </CardDescription>
-          </div>
-          <CalendarSystemToggle />
+        <div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CalendarClock className="h-4 w-4" />
+            {fa ? 'تأیید تاریخ شروع پروژه' : 'Confirm project start date'}
+          </CardTitle>
+          <CardDescription className="mt-1">
+            {fa
+              ? 'تاریخ شروع جدید را وارد کنید تا برنامه با مدت تسک‌ها و وابستگی‌ها دوباره محاسبه شود.'
+              : 'Set the project start to rebuild all task dates from durations and dependencies.'}
+          </CardDescription>
         </div>
       </CardHeader>
       <CardContent className="pt-6 space-y-4">
         <p className="text-sm">
           {fa ? 'شروع برنامه (baseline MSP):' : 'Schedule baseline start:'}{' '}
-          <strong>{formatScheduleDate(baselineStart, calendar)}</strong>
-          <span className="text-muted-foreground text-xs ml-2">({baselineStart})</span>
+          <strong>
+            <FormattedDate value={baselineStart} />
+          </strong>
         </p>
 
         {step === 'question' ? (
@@ -117,30 +115,24 @@ export function ScheduleStartWizard({ projectId, baselineStart, onComplete }: Sc
             <p className="font-medium">
               {fa ? 'تاریخ شروع واقعی پروژه را وارد کنید:' : 'Enter the actual project start date:'}
             </p>
-            <div className="space-y-2 max-w-xs">
-              <Label htmlFor="actual-start">{fa ? 'تاریخ (میلادی)' : 'Date (Gregorian)'}</Label>
-              <Input
-                id="actual-start"
-                type="date"
-                value={actualStart}
-                onChange={(e) => setActualStart(e.target.value)}
-              />
+            <ScheduleDateInput
+              id="actual-start"
+              valueIso={actualStart}
+              onChangeIso={setActualStart}
+              className="max-w-xs"
+            />
+            {dayDelta !== 0 ? (
               <p className="text-xs text-muted-foreground">
-                {fa ? 'شمسی:' : 'Shamsi:'}{' '}
-                <strong>{formatScheduleDate(actualStart, 'jalali')}</strong>
-                {shiftPreview !== 0 ? (
-                  <>
-                    {' '}
-                    · {fa ? 'جابجایی' : 'Shift'}: {shiftPreview > 0 ? '+' : ''}
-                    {shiftPreview} {fa ? 'روز' : 'days'}
-                  </>
-                ) : null}
+                {fa ? 'فاصله از baseline:' : 'Offset from baseline:'}{' '}
+                {dayDelta > 0 ? '+' : ''}
+                {dayDelta} {fa ? 'روز' : 'days'} —{' '}
+                {fa ? 'برنامه با وابستگی‌ها بازمحاسبه می‌شود' : 'schedule will be rebuilt via dependencies'}
               </p>
-            </div>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <Button type="button" disabled={loading || !actualStart} onClick={() => submit(false)}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {fa ? 'اعمال و به‌روزرسانی برنامه' : 'Apply & update schedule'}
+                {fa ? 'بازمحاسبه و به‌روزرسانی برنامه' : 'Rebuild & update schedule'}
               </Button>
               <Button type="button" variant="ghost" onClick={() => setStep('question')}>
                 {fa ? 'بازگشت' : 'Back'}
@@ -153,24 +145,27 @@ export function ScheduleStartWizard({ projectId, baselineStart, onComplete }: Sc
           <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 space-y-2">
             <p className="text-sm font-medium text-emerald-900 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
-              {fa ? 'برنامه به‌روز شد' : 'Schedule updated'}
+              {fa ? 'برنامه بازمحاسبه شد' : 'Schedule rebuilt'}
             </p>
             <ul className="text-sm text-emerald-900/90 space-y-1">
               <li>
                 {fa ? 'شروع واقعی:' : 'Actual start:'}{' '}
-                {formatScheduleDate(analysis.actual_start, calendar)}
+                <FormattedDate value={analysis.actual_start} />
               </li>
               <li>
-                {fa ? 'جابجایی:' : 'Shift:'} {analysis.shift_days}{' '}
-                {fa ? 'روز' : 'days'}
+                {fa ? 'تسک‌های به‌روز شده:' : 'Tasks updated:'} {analysis.tasks_updated}
+                {analysis.rebuilt_from_dependencies
+                  ? fa
+                    ? ' (با وابستگی‌ها)'
+                    : ' (with dependencies)'
+                  : ''}
               </li>
               <li>
-                {fa ? 'تسک‌ها:' : 'Tasks:'} {analysis.tasks_updated} · {fa ? 'در جریان' : 'in progress'}:{' '}
-                {analysis.tasks_in_progress} · {fa ? 'تمام' : 'done'}: {analysis.tasks_completed}
+                {fa ? 'در جریان' : 'In progress'}: {analysis.tasks_in_progress} · {fa ? 'تمام' : 'Done'}:{' '}
+                {analysis.tasks_completed} · {fa ? 'تأخیر' : 'Delayed'}: {analysis.tasks_delayed}
               </li>
               <li>
-                {fa ? 'تأخیر' : 'Delayed'}: {analysis.tasks_delayed} · {fa ? 'پیشرفت کل' : 'Overall'}:{' '}
-                {analysis.overall_percent}%
+                {fa ? 'پیشرفت کل' : 'Overall progress'}: {analysis.overall_percent}%
               </li>
             </ul>
           </div>

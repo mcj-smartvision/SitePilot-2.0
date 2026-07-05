@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LogoutButton } from '@/components/auth/logout-button'
 import { HeaderLanguageSwitcher } from '@/components/i18n/header-language-switcher'
+import { HeaderCalendarSwitcher } from '@/components/schedule/header-calendar-switcher'
 import { HeaderProjectSwitcher } from '@/components/project/header-project-switcher'
 import { useLocale } from '@/components/i18n/locale-provider'
 import type { RoleNavLink } from '@/lib/dashboard/role-nav'
@@ -67,6 +68,7 @@ export function DashboardHeader({ email, isAdmin, roleNavLinks = [] }: Dashboard
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <HeaderProjectSwitcher className="hidden sm:block" />
+          <HeaderCalendarSwitcher />
           <HeaderLanguageSwitcher />
           <span className="text-sm text-muted-foreground hidden md:inline max-w-[180px] truncate">{email}</span>
           <LogoutButton label={app.signOut} />

@@ -1,4 +1,4 @@
-import jalaali from 'jalaali-js'
+import { toJalaali, toGregorian } from 'jalaali-js'
 import type { ScheduleCalendar } from '@/lib/schedule/calendar-preference'
 
 function pad2(n: number): string {
@@ -10,26 +10,70 @@ function parseIsoDate(value: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-/** Format ISO timestamp for schedule display (Gregorian or Jalali). */
+/** Format ISO timestamp for schedule display (Gregorian or Jalali only — never mixed). */
 export function formatScheduleDate(
   value: string | null | undefined,
-  calendar: ScheduleCalendar = 'gregorian'
+  calendar: ScheduleCalendar = 'jalali'
 ): string {
   if (!value) return '—'
   const d = parseIsoDate(value)
   if (!d) return '—'
 
   if (calendar === 'jalali') {
-    const { jy, jm, jd } = jalaali.toJalaali(d.getFullYear(), d.getMonth() + 1, d.getDate())
+    const { jy, jm, jd } = toJalaali(d.getFullYear(), d.getMonth() + 1, d.getDate())
     return `${jy}/${pad2(jm)}/${pad2(jd)}`
   }
 
   return d.toLocaleDateString('en-CA')
 }
 
+/** Value for calendar-aware text/date inputs (matches active calendar mode). */
+export function isoToCalendarInput(
+  iso: string | null | undefined,
+  calendar: ScheduleCalendar
+): string {
+  const isoDate = toIsoDateOnly(iso)
+  if (!isoDate) return ''
+
+  if (calendar === 'gregorian') return isoDate
+
+  const [gy, gm, gd] = isoDate.split('-').map(Number)
+  const { jy, jm, jd } = toJalaali(gy, gm, gd)
+  return `${jy}/${pad2(jm)}/${pad2(jd)}`
+}
+
+/** Parse user input in the active calendar mode → normalized YYYY-MM-DD (Gregorian). */
+export function parseScheduleDateInput(
+  input: string,
+  calendar: ScheduleCalendar
+): string | null {
+  const trimmed = input.trim()
+  if (!trimmed) return null
+
+  if (calendar === 'gregorian') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null
+    const d = new Date(`${trimmed}T12:00:00`)
+    return Number.isNaN(d.getTime()) ? null : trimmed
+  }
+
+  const normalized = trimmed.replace(/-/g, '/')
+  const match = normalized.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/)
+  if (!match) return null
+
+  const jy = Number(match[1])
+  const jm = Number(match[2])
+  const jd = Number(match[3])
+  if (jm < 1 || jm > 12 || jd < 1 || jd > 31) return null
+
+  const { gy, gm, gd } = toGregorian(jy, jm, jd)
+  const iso = `${gy}-${pad2(gm)}-${pad2(gd)}`
+  const d = new Date(`${iso}T12:00:00`)
+  return Number.isNaN(d.getTime()) ? null : iso
+}
+
 export function formatScheduleDateTime(
   value: string | null | undefined,
-  calendar: ScheduleCalendar = 'gregorian'
+  calendar: ScheduleCalendar = 'jalali'
 ): string {
   if (!value) return '—'
   const datePart = formatScheduleDate(value, calendar)

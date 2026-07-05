@@ -1,16 +1,16 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ScheduleStartWizard } from '@/components/admin/schedule-start-wizard'
+import { ActualStartPanel } from '@/components/admin/actual-start-panel'
 import { ScheduleDateToolbar } from '@/components/schedule/schedule-date-toolbar'
-import { useScheduleCalendar } from '@/hooks/useScheduleCalendar'
+import { SchedulePreviewTable } from '@/components/schedule/schedule-preview-table'
+import { FormattedDate } from '@/components/schedule/formatted-date'
 import { useScheduleViewDate } from '@/hooks/useScheduleViewDate'
-import { formatScheduleDate } from '@/lib/schedule/dates'
-import { getTaskViewStatus } from '@/lib/schedule/task-view-date'
+import { compareWbs } from '@/lib/schedule/wbs-utils'
 import type { ProjectTask, ScheduleImport } from '@/types/schedule'
 import { CalendarRange, CheckCircle2, FileUp, Loader2, AlertTriangle } from 'lucide-react'
 
@@ -21,6 +21,7 @@ interface ScheduleImportPanelProps {
   previewTasks: ProjectTask[]
   scheduleBaselineStart: string | null
   scheduleActualStart: string | null
+  predecessorLabels: Record<string, string>
 }
 
 function statusBadge(status: ScheduleImport['status']) {
@@ -30,30 +31,64 @@ function statusBadge(status: ScheduleImport['status']) {
   return <Badge variant="outline">Pending</Badge>
 }
 
+function sortTasks(tasks: ProjectTask[]): ProjectTask[] {
+  return [...tasks].sort((a, b) => compareWbs(a.wbs_code, b.wbs_code))
+}
+
 export function ScheduleImportPanel({
   projectId,
   initialImports,
   taskCount,
   previewTasks,
   scheduleBaselineStart,
-  scheduleActualStart,
+  scheduleActualStart: initialActualStart,
+  predecessorLabels,
 }: ScheduleImportPanelProps) {
   const router = useRouter()
-  const { calendar } = useScheduleCalendar()
-  const { viewDate } = useScheduleViewDate()
+  const { viewDate, setViewDate, resetToToday } = useScheduleViewDate()
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [pendingBaseline, setPendingBaseline] = useState<string | null>(null)
-  const [wizardDone, setWizardDone] = useState(false)
+  const [importSuccess, setImportSuccess] = useState<string | null>(null)
 
-  const showWizard =
-    Boolean(pendingBaseline) ||
-    (Boolean(scheduleBaselineStart) && !scheduleActualStart && taskCount > 0 && !wizardDone)
+  const [tasks, setTasks] = useState(() => sortTasks(previewTasks))
+  const [actualStart, setActualStart] = useState(initialActualStart)
+  const [draftStart, setDraftStart] = useState<string | null>(null)
+  const [baselineStart, setBaselineStart] = useState(scheduleBaselineStart)
 
-  const wizardBaseline = pendingBaseline ?? scheduleBaselineStart ?? ''
+  useEffect(() => {
+    setTasks(sortTasks(previewTasks))
+  }, [previewTasks])
+
+  useEffect(() => {
+    setActualStart(initialActualStart)
+  }, [initialActualStart])
+
+  useEffect(() => {
+    setBaselineStart(scheduleBaselineStart)
+  }, [scheduleBaselineStart])
+
+  const displayTasks = useMemo(() => (tasks.length > 0 ? tasks : sortTasks(previewTasks)), [tasks, previewTasks])
+  const hasSchedule = taskCount > 0 || displayTasks.length > 0
+
+  /** Banner reflects applied start, or draft selection before first apply. */
+  const bannerStart = actualStart ?? draftStart ?? baselineStart
+
+  const handleDraftChange = useCallback((iso: string) => {
+    setDraftStart(iso)
+  }, [])
+
+  const handleRescheduled = useCallback(
+    (payload: { tasks: ProjectTask[]; actualStart: string }) => {
+      if (payload.tasks.length > 0) {
+        setTasks(sortTasks(payload.tasks))
+      }
+      setActualStart(payload.actualStart)
+      setDraftStart(null)
+    },
+    []
+  )
 
   async function handleImport() {
     if (!file) {
@@ -68,8 +103,7 @@ export function ScheduleImportPanel({
 
     setLoading(true)
     setError(null)
-    setSuccess(null)
-    setWizardDone(false)
+    setImportSuccess(null)
 
     try {
       const formData = new FormData()
@@ -84,10 +118,12 @@ export function ScheduleImportPanel({
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Import failed')
 
-      setSuccess(
+      setImportSuccess(
         `Imported ${data.tasks_imported} tasks and ${data.dependencies_imported} dependencies.`
       )
-      setPendingBaseline(data.baseline_start ?? null)
+      setBaselineStart(data.baseline_start ?? null)
+      setActualStart(null)
+      setDraftStart(null)
       setFile(null)
       if (inputRef.current) inputRef.current.value = ''
       router.refresh()
@@ -100,23 +136,34 @@ export function ScheduleImportPanel({
 
   return (
     <div className="space-y-6">
-      <ScheduleDateToolbar />
+      <ScheduleDateToolbar
+        viewDate={viewDate}
+        onViewDateChange={setViewDate}
+        onResetToday={resetToToday}
+      />
 
-      {scheduleActualStart ? (
-        <p className="text-sm text-muted-foreground">
-          Actual start:{' '}
-          <strong>{formatScheduleDate(scheduleActualStart, calendar)}</strong>
+      {bannerStart ? (
+        <p className="text-sm rounded-lg border bg-primary/5 px-4 py-3">
+          <span className="text-muted-foreground">
+            {actualStart ? 'Actual start: ' : 'Project start: '}
+          </span>
+          <strong className="text-primary tabular-nums">
+            <FormattedDate value={bannerStart} />
+          </strong>
+          {!actualStart && draftStart ? (
+            <span className="text-muted-foreground text-xs ms-2">(pending apply)</span>
+          ) : null}
         </p>
       ) : null}
 
-      {showWizard && wizardBaseline ? (
-        <ScheduleStartWizard
+      {hasSchedule ? (
+        <ActualStartPanel
           projectId={projectId}
-          baselineStart={wizardBaseline}
-          onComplete={() => {
-            setPendingBaseline(null)
-            setWizardDone(true)
-          }}
+          baselineStart={baselineStart}
+          actualStart={actualStart}
+          taskCount={taskCount}
+          onDraftChange={handleDraftChange}
+          onRescheduled={handleRescheduled}
         />
       ) : null}
 
@@ -129,7 +176,7 @@ export function ScheduleImportPanel({
             <div>
               <CardTitle className="text-base">Import MSP Schedule</CardTitle>
               <CardDescription>
-                Upload Microsoft Project XML. Then confirm actual start date to shift the schedule.
+                Upload Microsoft Project XML, then set actual start to rebuild the full schedule.
               </CardDescription>
             </div>
           </div>
@@ -156,10 +203,10 @@ export function ScheduleImportPanel({
             </p>
           ) : null}
 
-          {success ? (
+          {importSuccess ? (
             <p className="text-sm text-emerald-700 flex items-center gap-2 bg-emerald-50 rounded-md px-3 py-2">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
-              {success}
+              {importSuccess}
             </p>
           ) : null}
 
@@ -194,56 +241,20 @@ export function ScheduleImportPanel({
         </Card>
       </div>
 
-      {previewTasks.length > 0 ? (
+      {displayTasks.length > 0 ? (
         <Card>
           <CardHeader className="border-b bg-muted/20 pb-4">
-            <CardTitle className="text-base">Schedule preview (first {previewTasks.length})</CardTitle>
+            <CardTitle className="text-base">
+              Schedule preview ({displayTasks.length}
+              {taskCount > displayTasks.length ? ` of ${taskCount}` : ''})
+            </CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30">
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">WBS</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Task</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Start</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Finish</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewTasks.map((task) => {
-                    const status = getTaskViewStatus(task, viewDate)
-                    return (
-                    <tr key={task.id} className="border-b last:border-0">
-                      <td className="px-4 py-3 font-mono text-xs">{task.wbs_code ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        {task.name}
-                        {task.is_critical ? (
-                          <Badge variant="destructive" className="ml-2 text-[10px]">
-                            Critical
-                          </Badge>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3">
-                        {formatScheduleDate(task.start_current ?? task.start_planned, calendar)}
-                      </td>
-                      <td className="px-4 py-3">
-                        {formatScheduleDate(task.finish_current ?? task.finish_planned, calendar)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className="text-[10px] capitalize">
-                          {status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">{task.percent_complete}%</td>
-                    </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+          <CardContent className="p-0 pt-0">
+            <SchedulePreviewTable
+              tasks={displayTasks}
+              predecessorLabels={predecessorLabels}
+              statusAsOf={viewDate}
+            />
           </CardContent>
         </Card>
       ) : null}
@@ -259,7 +270,7 @@ export function ScheduleImportPanel({
                 <div>
                   <p className="font-medium text-sm">{item.file_name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(item.created_at).toLocaleString()}
+                    <FormattedDate value={item.created_at} dateTime />
                     {item.status === 'completed'
                       ? ` · ${item.tasks_imported} tasks, ${item.dependencies_imported} links`
                       : ''}

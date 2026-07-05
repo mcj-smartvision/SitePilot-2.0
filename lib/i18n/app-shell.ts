@@ -7,6 +7,7 @@ export interface AppShellMessages {
   settings: string
   signOut: string
   language: string
+  calendar: string
   login: string
   email: string
   username: string
@@ -23,6 +24,7 @@ export const APP_SHELL: Record<FormLocale, AppShellMessages> = {
     settings: 'Settings',
     signOut: 'Sign out',
     language: 'Language',
+    calendar: 'Calendar',
     login: 'Sign in',
     email: 'Email',
     username: 'Username',
@@ -37,6 +39,7 @@ export const APP_SHELL: Record<FormLocale, AppShellMessages> = {
     settings: 'Einstellungen',
     signOut: 'Abmelden',
     language: 'Sprache',
+    calendar: 'Kalender',
     login: 'Anmelden',
     email: 'E-Mail',
     username: 'Benutzername',
@@ -51,6 +54,7 @@ export const APP_SHELL: Record<FormLocale, AppShellMessages> = {
     settings: 'Paramètres',
     signOut: 'Déconnexion',
     language: 'Langue',
+    calendar: 'Calendrier',
     login: 'Connexion',
     email: 'E-mail',
     username: "Nom d'utilisateur",
@@ -65,6 +69,7 @@ export const APP_SHELL: Record<FormLocale, AppShellMessages> = {
     settings: 'الإعدادات',
     signOut: 'تسجيل الخروج',
     language: 'اللغة',
+    calendar: 'التقويم',
     login: 'تسجيل الدخول',
     email: 'البريد الإلكتروني',
     username: 'اسم المستخدم',
@@ -79,6 +84,7 @@ export const APP_SHELL: Record<FormLocale, AppShellMessages> = {
     settings: 'تنظیمات',
     signOut: 'خروج',
     language: 'زبان',
+    calendar: 'تقویم',
     login: 'ورود',
     email: 'ایمیل',
     username: 'نام کاربری',

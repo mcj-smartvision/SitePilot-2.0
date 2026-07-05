@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Input } from '@/components/ui/input'
+import { ScheduleDateInput } from '@/components/schedule/schedule-date-input'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -21,10 +21,10 @@ import type { DashboardUserContext } from '@/types/dashboard'
 import type { ProjectTask } from '@/types/schedule'
 import { createDailyReport, requestDailyReportAiParse } from '@/utils/schedule'
 import { ScheduleDateToolbar } from '@/components/schedule/schedule-date-toolbar'
-import { useScheduleCalendar } from '@/hooks/useScheduleCalendar'
+import { FormattedDate } from '@/components/schedule/formatted-date'
 import { useScheduleViewDate } from '@/hooks/useScheduleViewDate'
-import { formatScheduleDate } from '@/lib/schedule/dates'
-import { filterTasksForViewDate, getTaskViewStatus } from '@/lib/schedule/task-view-date'
+import { TaskStatusBadge, CriticalBadge } from '@/components/schedule/task-status-badge'
+import { filterTasksForViewDate, getTaskScheduleStatus } from '@/lib/schedule/task-view-date'
 import { CalendarDays, CheckCircle2, ClipboardList } from 'lucide-react'
 
 interface SiteSupervisorDashboardProps {
@@ -42,7 +42,6 @@ export function SiteSupervisorDashboard({
 }: SiteSupervisorDashboardProps) {
   const router = useRouter()
   const supabase = createClient()
-  const { calendar } = useScheduleCalendar()
   const { viewDate } = useScheduleViewDate()
   const [projectId, setProjectId] = useState(initialProjectId ?? '')
   const [tasks] = useState(initialTasks)
@@ -130,7 +129,7 @@ export function SiteSupervisorDashboard({
         <CardHeader className="border-b bg-muted/20">
           <CardTitle className="text-base flex items-center gap-2">
             <CalendarDays className="h-4 w-4" />
-            Tasks on {formatScheduleDate(viewDate, calendar)}
+            Tasks on <FormattedDate value={viewDate} />
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -143,22 +142,20 @@ export function SiteSupervisorDashboard({
           ) : (
             <div className="divide-y">
               {visibleTasks.map((task) => {
-                const status = getTaskViewStatus(task, viewDate)
+                const status = getTaskScheduleStatus(task)
                 return (
                 <div key={task.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-4">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{task.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatScheduleDate(task.start_current ?? task.start_planned, calendar)} →{' '}
-                      {formatScheduleDate(task.finish_current ?? task.finish_planned, calendar)}
+                      <FormattedDate value={task.start_planned ?? task.start_current} /> →{' '}
+                      <FormattedDate value={task.finish_planned ?? task.finish_current} />
                       {task.wbs_code ? ` · WBS ${task.wbs_code}` : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant="outline" className="capitalize text-[10px]">
-                      {status}
-                    </Badge>
-                    {task.is_critical ? <Badge variant="destructive">Critical</Badge> : null}
+                    <TaskStatusBadge status={status} />
+                    {task.is_critical ? <CriticalBadge /> : null}
                     <Badge variant="outline">{task.percent_complete}%</Badge>
                   </div>
                 </div>
@@ -178,16 +175,13 @@ export function SiteSupervisorDashboard({
         </CardHeader>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="report-date">Date</Label>
-              <Input
-                id="report-date"
-                type="date"
-                value={reportDate}
-                onChange={(e) => setReportDate(e.target.value)}
-                className="max-w-[200px]"
-              />
-            </div>
+            <ScheduleDateInput
+              id="report-date"
+              label="Date"
+              valueIso={reportDate}
+              onChangeIso={setReportDate}
+              className="max-w-[200px]"
+            />
             <div className="space-y-2">
               <Label htmlFor="raw-text">Site status & issues</Label>
               <Textarea

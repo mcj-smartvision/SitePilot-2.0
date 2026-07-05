@@ -46,13 +46,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const analysis = await applyActualStartToSchedule(supabase, {
+    const result = await applyActualStartToSchedule(supabase, {
       projectId,
       actualStartDate: alignedWithBaseline ? '' : actualStartDate,
       alignedWithBaseline,
     })
 
-    return NextResponse.json({ analysis })
+    return NextResponse.json(result)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Apply actual start failed'
     return NextResponse.json({ error: message }, { status: 500 })

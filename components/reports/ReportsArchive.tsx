@@ -10,11 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { FormattedDate } from '@/components/schedule/formatted-date'
 import type { EquipmentItem, ExtendedAnalysis, ReportWithAnalysis, WorkerRole } from '@/types'
-
-function formatDate(dateStr: string) {
-  return new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(dateStr))
-}
 
 function safetyLabel(value?: string) {
   const map: Record<string, string> = {
@@ -134,7 +131,7 @@ function ReportCard({ report }: { report: ReportWithAnalysis }) {
       </div>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">{report.project_name || 'پروژه'}</CardTitle>
-        <p className="text-xs text-muted-foreground">{formatDate(report.created_at)}</p>
+        <p className="text-xs text-muted-foreground"><FormattedDate value={report.created_at} dateTime /></p>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap gap-2">
