@@ -21,22 +21,28 @@ export async function fetchProjectTasksForWeek(
   supabase: SupabaseClient,
   projectId: string
 ): Promise<ProjectTask[]> {
-  const start = todayIsoDate()
-  const end = weekEndIsoDate()
-
   const { data, error } = await supabase
     .from('project_tasks')
     .select('*')
     .eq('project_id', projectId)
-    .or(`and(start_planned.lte.${end}T23:59:59,finish_planned.gte.${start}T00:00:00),and(start_current.lte.${end}T23:59:59,finish_current.gte.${start}T00:00:00)`)
-    .order('start_planned', { ascending: true })
+    .order('start_current', { ascending: true, nullsFirst: false })
 
   if (error) {
     if (error.code === '42P01') return []
     throw new Error(error.message)
   }
 
-  return (data ?? []) as ProjectTask[]
+  const tasks = (data ?? []) as ProjectTask[]
+  const start = todayIsoDate()
+  const end = weekEndIsoDate()
+
+  return tasks.filter((task) => {
+    const startIso = (task.start_current ?? task.start_planned)?.slice(0, 10)
+    const finishIso = (task.finish_current ?? task.finish_planned)?.slice(0, 10)
+    if (!startIso && !finishIso) return true
+    if (startIso && startIso <= end && (!finishIso || finishIso >= start)) return true
+    return false
+  })
 }
 
 export async function fetchAllProjectTasks(

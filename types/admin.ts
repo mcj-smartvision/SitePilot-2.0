@@ -28,6 +28,9 @@ export interface AdminProject {
   is_active: boolean
   start_date?: string | null
   end_date?: string | null
+  schedule_baseline_start?: string | null
+  schedule_actual_start?: string | null
+  schedule_start_aligned?: boolean | null
   created_at?: string
   updated_at?: string
 }

@@ -115,6 +115,8 @@ export interface MspImportResult {
   import_id: string
   tasks_imported: number
   dependencies_imported: number
+  baseline_start?: string
+  needs_start_confirmation?: boolean
 }
 
 export interface ProjectScheduleSummary {

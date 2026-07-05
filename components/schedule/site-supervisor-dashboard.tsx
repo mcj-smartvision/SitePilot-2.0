@@ -20,6 +20,11 @@ import {
 import type { DashboardUserContext } from '@/types/dashboard'
 import type { ProjectTask } from '@/types/schedule'
 import { createDailyReport, requestDailyReportAiParse } from '@/utils/schedule'
+import { ScheduleDateToolbar } from '@/components/schedule/schedule-date-toolbar'
+import { useScheduleCalendar } from '@/hooks/useScheduleCalendar'
+import { useScheduleViewDate } from '@/hooks/useScheduleViewDate'
+import { formatScheduleDate } from '@/lib/schedule/dates'
+import { filterTasksForViewDate, getTaskViewStatus } from '@/lib/schedule/task-view-date'
 import { CalendarDays, CheckCircle2, ClipboardList } from 'lucide-react'
 
 interface SiteSupervisorDashboardProps {
@@ -27,11 +32,6 @@ interface SiteSupervisorDashboardProps {
   projectOptions: { id: string; name: string }[]
   initialProjectId: string | null
   initialTasks: ProjectTask[]
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return '—'
-  return new Date(value).toLocaleDateString()
 }
 
 export function SiteSupervisorDashboard({
@@ -42,6 +42,8 @@ export function SiteSupervisorDashboard({
 }: SiteSupervisorDashboardProps) {
   const router = useRouter()
   const supabase = createClient()
+  const { calendar } = useScheduleCalendar()
+  const { viewDate } = useScheduleViewDate()
   const [projectId, setProjectId] = useState(initialProjectId ?? '')
   const [tasks] = useState(initialTasks)
   const [reportDate, setReportDate] = useState(new Date().toISOString().slice(0, 10))
@@ -97,12 +99,16 @@ export function SiteSupervisorDashboard({
     )
   }
 
+  const visibleTasks = filterTasksForViewDate(tasks, viewDate, 'relevant')
+
   return (
     <div className="space-y-6 max-w-5xl">
       <PageHeader
         title="Site Supervisor"
-        description="Review this week's planned tasks and submit your daily site report."
+        description="Review planned tasks and submit your daily site report."
       />
+
+      <ScheduleDateToolbar />
 
       <div className="flex flex-wrap items-center gap-3">
         <Label className="text-sm font-medium">Project</Label>
@@ -124,31 +130,40 @@ export function SiteSupervisorDashboard({
         <CardHeader className="border-b bg-muted/20">
           <CardTitle className="text-base flex items-center gap-2">
             <CalendarDays className="h-4 w-4" />
-            Tasks — today / this week
+            Tasks on {formatScheduleDate(viewDate, calendar)}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {tasks.length === 0 ? (
+          {visibleTasks.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
-              No schedule tasks yet. Ask admin to import MSP XML under Admin → Projects → Schedule.
+              {tasks.length === 0
+                ? 'No schedule tasks yet. Ask admin to import MSP XML under Admin → Projects → Schedule.'
+                : 'No active tasks on this date. Change the view date above.'}
             </div>
           ) : (
             <div className="divide-y">
-              {tasks.map((task) => (
+              {visibleTasks.map((task) => {
+                const status = getTaskViewStatus(task, viewDate)
+                return (
                 <div key={task.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-4">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{task.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatDate(task.start_planned)} → {formatDate(task.finish_planned)}
+                      {formatScheduleDate(task.start_current ?? task.start_planned, calendar)} →{' '}
+                      {formatScheduleDate(task.finish_current ?? task.finish_planned, calendar)}
                       {task.wbs_code ? ` · WBS ${task.wbs_code}` : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant="outline" className="capitalize text-[10px]">
+                      {status}
+                    </Badge>
                     {task.is_critical ? <Badge variant="destructive">Critical</Badge> : null}
                     <Badge variant="outline">{task.percent_complete}%</Badge>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>

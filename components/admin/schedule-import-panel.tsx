@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { ScheduleStartWizard } from '@/components/admin/schedule-start-wizard'
+import { ScheduleDateToolbar } from '@/components/schedule/schedule-date-toolbar'
+import { useScheduleCalendar } from '@/hooks/useScheduleCalendar'
+import { useScheduleViewDate } from '@/hooks/useScheduleViewDate'
+import { formatScheduleDate } from '@/lib/schedule/dates'
+import { getTaskViewStatus } from '@/lib/schedule/task-view-date'
 import type { ProjectTask, ScheduleImport } from '@/types/schedule'
 import { CalendarRange, CheckCircle2, FileUp, Loader2, AlertTriangle } from 'lucide-react'
 
@@ -13,11 +19,8 @@ interface ScheduleImportPanelProps {
   initialImports: ScheduleImport[]
   taskCount: number
   previewTasks: ProjectTask[]
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return '—'
-  return new Date(value).toLocaleDateString()
+  scheduleBaselineStart: string | null
+  scheduleActualStart: string | null
 }
 
 function statusBadge(status: ScheduleImport['status']) {
@@ -32,13 +35,25 @@ export function ScheduleImportPanel({
   initialImports,
   taskCount,
   previewTasks,
+  scheduleBaselineStart,
+  scheduleActualStart,
 }: ScheduleImportPanelProps) {
   const router = useRouter()
+  const { calendar } = useScheduleCalendar()
+  const { viewDate } = useScheduleViewDate()
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [pendingBaseline, setPendingBaseline] = useState<string | null>(null)
+  const [wizardDone, setWizardDone] = useState(false)
+
+  const showWizard =
+    Boolean(pendingBaseline) ||
+    (Boolean(scheduleBaselineStart) && !scheduleActualStart && taskCount > 0 && !wizardDone)
+
+  const wizardBaseline = pendingBaseline ?? scheduleBaselineStart ?? ''
 
   async function handleImport() {
     if (!file) {
@@ -46,8 +61,7 @@ export function ScheduleImportPanel({
       return
     }
 
-    const lower = file.name.toLowerCase()
-    if (!lower.endsWith('.xml')) {
+    if (!file.name.toLowerCase().endsWith('.xml')) {
       setError('Only XML files are supported. In Microsoft Project: File → Save As → XML.')
       return
     }
@@ -55,6 +69,7 @@ export function ScheduleImportPanel({
     setLoading(true)
     setError(null)
     setSuccess(null)
+    setWizardDone(false)
 
     try {
       const formData = new FormData()
@@ -72,6 +87,7 @@ export function ScheduleImportPanel({
       setSuccess(
         `Imported ${data.tasks_imported} tasks and ${data.dependencies_imported} dependencies.`
       )
+      setPendingBaseline(data.baseline_start ?? null)
       setFile(null)
       if (inputRef.current) inputRef.current.value = ''
       router.refresh()
@@ -84,6 +100,26 @@ export function ScheduleImportPanel({
 
   return (
     <div className="space-y-6">
+      <ScheduleDateToolbar />
+
+      {scheduleActualStart ? (
+        <p className="text-sm text-muted-foreground">
+          Actual start:{' '}
+          <strong>{formatScheduleDate(scheduleActualStart, calendar)}</strong>
+        </p>
+      ) : null}
+
+      {showWizard && wizardBaseline ? (
+        <ScheduleStartWizard
+          projectId={projectId}
+          baselineStart={wizardBaseline}
+          onComplete={() => {
+            setPendingBaseline(null)
+            setWizardDone(true)
+          }}
+        />
+      ) : null}
+
       <Card className="shadow-card border-primary/20">
         <CardHeader className="border-b bg-muted/20">
           <div className="flex items-center gap-3">
@@ -93,7 +129,7 @@ export function ScheduleImportPanel({
             <div>
               <CardTitle className="text-base">Import MSP Schedule</CardTitle>
               <CardDescription>
-                Upload Microsoft Project XML. Tasks appear in Site Supervisor and Project Manager dashboards.
+                Upload Microsoft Project XML. Then confirm actual start date to shift the schedule.
               </CardDescription>
             </div>
           </div>
@@ -110,9 +146,7 @@ export function ScheduleImportPanel({
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
             />
-            {file ? (
-              <p className="text-xs text-muted-foreground">Selected: {file.name}</p>
-            ) : null}
+            {file ? <p className="text-xs text-muted-foreground">Selected: {file.name}</p> : null}
           </div>
 
           {error ? (
@@ -174,11 +208,14 @@ export function ScheduleImportPanel({
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Task</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Start</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Finish</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">%</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {previewTasks.map((task) => (
+                  {previewTasks.map((task) => {
+                    const status = getTaskViewStatus(task, viewDate)
+                    return (
                     <tr key={task.id} className="border-b last:border-0">
                       <td className="px-4 py-3 font-mono text-xs">{task.wbs_code ?? '—'}</td>
                       <td className="px-4 py-3">
@@ -189,11 +226,21 @@ export function ScheduleImportPanel({
                           </Badge>
                         ) : null}
                       </td>
-                      <td className="px-4 py-3">{formatDate(task.start_planned)}</td>
-                      <td className="px-4 py-3">{formatDate(task.finish_planned)}</td>
+                      <td className="px-4 py-3">
+                        {formatScheduleDate(task.start_current ?? task.start_planned, calendar)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {formatScheduleDate(task.finish_current ?? task.finish_planned, calendar)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className="text-[10px] capitalize">
+                          {status}
+                        </Badge>
+                      </td>
                       <td className="px-4 py-3">{task.percent_complete}%</td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

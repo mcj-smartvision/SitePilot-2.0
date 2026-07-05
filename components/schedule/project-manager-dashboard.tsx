@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader, EmptyState } from '@/components/admin/shared'
+import { ScheduleDateToolbar } from '@/components/schedule/schedule-date-toolbar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -71,6 +72,8 @@ export function ProjectManagerDashboard({
         title="Project Manager"
         description="Monitor progress, delays, alerts, and approve daily supervisor reports."
       />
+
+      <ScheduleDateToolbar />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>

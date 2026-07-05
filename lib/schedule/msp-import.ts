@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MspImportResult, ProjectTask, ScheduleImport } from '@/types/schedule'
 import { parseMspXml } from '@/lib/schedule/msp-parser'
+import { computeBaselineStartFromTasks } from '@/lib/schedule/dates'
+import { setScheduleBaselineAfterImport } from '@/lib/schedule/apply-actual-start'
 
 export interface MspParsedTask {
   msp_uid: number
@@ -113,10 +115,19 @@ export async function importMspScheduleToProject(
       })
       .eq('id', importRow.id)
 
+    const baseline_start =
+      computeBaselineStartFromTasks(
+        parsed.tasks.map((t) => ({ start_planned: t.start_planned }))
+      ) ?? new Date().toISOString().slice(0, 10)
+
+    await setScheduleBaselineAfterImport(supabase, projectId, baseline_start)
+
     return {
       import_id: importRow.id,
       tasks_imported: tasksImported,
       dependencies_imported: dependenciesImported,
+      baseline_start,
+      needs_start_confirmation: true,
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Import failed'
@@ -160,7 +171,7 @@ export async function fetchProjectTasksSummary(
     .from('project_tasks')
     .select('*', { count: 'exact' })
     .eq('project_id', projectId)
-    .order('start_planned', { ascending: true })
+    .order('start_current', { ascending: true, nullsFirst: false })
     .limit(50)
 
   if (error) {
