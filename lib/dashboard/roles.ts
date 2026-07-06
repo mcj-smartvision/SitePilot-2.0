@@ -4,6 +4,8 @@ export const SITE_ROLES = {
   SITE_SUPERVISOR: 'site_supervisor',
   STOREKEEPER: 'storekeeper',
   PROCUREMENT: 'procurement_officer',
+  QC: 'qa_qc_inspector',
+  HSE: 'hse_officer',
   SECURITY: 'security',
   CLIENT: 'client',
 } as const
@@ -15,6 +17,8 @@ export const SITE_ROLE_LABELS: Record<SiteRoleKey, string> = {
   site_supervisor: 'Site Supervisor',
   storekeeper: 'Storekeeper',
   procurement_officer: 'Procurement',
+  qa_qc_inspector: 'QC',
+  hse_officer: 'HSE',
   security: 'Security',
   client: 'Client',
 }
@@ -23,6 +27,8 @@ export const SITE_ROLE_LABELS: Record<SiteRoleKey, string> = {
 export const ROLE_PRIORITY: SiteRoleKey[] = [
   SITE_ROLES.PROJECT_MANAGER,
   SITE_ROLES.SITE_SUPERVISOR,
+  SITE_ROLES.QC,
+  SITE_ROLES.HSE,
   SITE_ROLES.PROCUREMENT,
   SITE_ROLES.STOREKEEPER,
   SITE_ROLES.SECURITY,
@@ -52,6 +58,8 @@ export const ROLE_WIDGET_KEYS: Record<SiteRoleKey, string[]> = {
   ],
   storekeeper: ['inventory.stock', 'overview.stats'],
   procurement_officer: ['schedule.overview', 'overview.stats'],
+  qa_qc_inspector: ['schedule.overview', 'overview.stats'],
+  hse_officer: ['safety.overview', 'overview.stats'],
   security: ['security.entry_exit', 'security.alerts', 'overview.stats'],
   client: ['progress.overview', 'financial.overview', 'reports.recent'],
 }

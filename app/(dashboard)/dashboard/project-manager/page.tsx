@@ -7,7 +7,7 @@ import {
   fetchRecentDailyReports,
   fetchUnresolvedAlerts,
 } from '@/utils/schedule'
-import { ProjectManagerDashboard } from '@/components/schedule/project-manager-dashboard'
+import { ProjectManagerDashboard } from '@/components/project-manager/project-manager-dashboard'
 
 export default async function ProjectManagerPage() {
   const supabase = createClient()

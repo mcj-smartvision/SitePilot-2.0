@@ -83,12 +83,26 @@ export async function confirmAiAction(
   actionId: string,
   supervisorId: string
 ): Promise<AiActionRow> {
+  const { data: existing, error: fetchError } = await supabase
+    .from('ai_actions')
+    .select('type')
+    .eq('id', actionId)
+    .eq('supervisor_id', supervisorId)
+    .single()
+
+  if (fetchError) throw new Error(fetchError.message)
+
+  const needsPmReview = ['purchase_request', 'subcontractor_instruction', 'hse_alert'].includes(
+    existing.type as string
+  )
+
   const { data, error } = await supabase
     .from('ai_actions')
     .update({
       status: 'confirmed_by_user' satisfies AiStatus,
       confirmed_by: supervisorId,
       confirmed_at: new Date().toISOString(),
+      pm_status: needsPmReview ? 'pending' : 'not_required',
     })
     .eq('id', actionId)
     .eq('supervisor_id', supervisorId)

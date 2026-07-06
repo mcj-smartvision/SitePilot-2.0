@@ -93,6 +93,19 @@ export interface AiActionRow {
   payload: Record<string, unknown>
   text_generated: string
   status: AiStatus
+  pm_status?: 'not_required' | 'pending' | 'approved' | 'rejected'
+  pm_reviewed_by?: string | null
+  pm_reviewed_at?: string | null
+  pm_rejection_reason?: string | null
+  procurement_status?:
+    | 'not_applicable'
+    | 'pending'
+    | 'sourcing'
+    | 'rfq_sent'
+    | 'po_issued'
+    | 'in_transit'
+    | 'received'
+    | 'cancelled'
   created_by: string
   confirmed_by: string | null
   confirmed_at: string | null

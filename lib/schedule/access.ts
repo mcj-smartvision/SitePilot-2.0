@@ -7,6 +7,8 @@ export const ROLE_DASHBOARD_ACCESS: Record<string, SiteRoleKey[]> = {
   'project-manager': ['project_manager'],
   storekeeper: ['storekeeper'],
   procurement: ['procurement_officer'],
+  qc: ['qa_qc_inspector'],
+  hse: ['hse_officer'],
   security: ['security'],
 }
 

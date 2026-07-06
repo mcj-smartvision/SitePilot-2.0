@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ModalOverlay } from '@/components/supervisor/modal-overlay'
-import { AiDraftViewer } from '@/components/supervisor/ai-draft-viewer'
+import { AiDraftViewer } from '@/components/shared/ai-draft-viewer'
 import type {
   ActualStatus,
   DailyReportInput,

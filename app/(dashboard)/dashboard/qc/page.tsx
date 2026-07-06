@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { loadRolePageData } from '@/lib/dashboard/load-role-page'
 import { hasRoleDashboardAccess } from '@/lib/schedule/access'
-import { ProcurementDashboard } from '@/components/procurement/procurement-dashboard'
+import { QcDashboard } from '@/components/qc/qc-dashboard'
 
-export default async function ProcurementDashboardPage() {
+export default async function QcDashboardPage() {
   const supabase = createClient()
   const {
     data: { user },
@@ -19,10 +19,10 @@ export default async function ProcurementDashboardPage() {
   )
 
   if (context.isFirstLogin) redirect('/first-login')
-  if (!hasRoleDashboardAccess(context, 'procurement')) redirect('/dashboard')
+  if (!hasRoleDashboardAccess(context, 'qc')) redirect('/dashboard')
 
   return (
-    <ProcurementDashboard
+    <QcDashboard
       key={activeProjectId ?? 'no-project'}
       initialContext={context}
       projectOptions={projectOptions}

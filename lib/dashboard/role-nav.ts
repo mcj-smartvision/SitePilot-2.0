@@ -12,6 +12,8 @@ const ROLE_DASHBOARD_PATHS: Record<SiteRoleKey, string> = {
   site_supervisor: '/dashboard/site-supervisor',
   storekeeper: '/dashboard/storekeeper',
   procurement_officer: '/dashboard/procurement',
+  qa_qc_inspector: '/dashboard/qc',
+  hse_officer: '/dashboard/hse',
   security: '/dashboard/security',
   client: '/dashboard',
 }
