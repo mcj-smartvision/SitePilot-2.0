@@ -1,11 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
+  canSnapshotPlannedAsBaseline,
+  ScheduleRebuildError,
+  snapshotPlannedAsBaseline,
+} from '@/lib/schedule/baseline-template'
+import {
   computeBaselineStartFromTasks,
   diffDaysIso,
   toIsoDateOnly,
 } from '@/lib/schedule/dates'
-import { rebuildScheduleFromProjectStart } from '@/lib/schedule/reschedule-engine'
-import type { ProjectTask, TaskDependency } from '@/types/schedule'
+import { shiftScheduleByActualStart } from '@/lib/schedule/reschedule-engine'
+import type { ProjectTask } from '@/types/schedule'
 
 export interface ApplyActualStartInput {
   projectId: string
@@ -17,12 +22,16 @@ export interface ScheduleStartAnalysis {
   baseline_start: string
   actual_start: string
   shift_days: number
+  /** Flat calendar-day offset applied to every baseline date. */
+  delta_days: number
   tasks_updated: number
   tasks_in_progress: number
   tasks_completed: number
   tasks_delayed: number
   overall_percent: number
   rebuilt_from_dependencies: boolean
+  anchor_wbs?: string | null
+  baseline_backfilled?: number
 }
 
 export interface ApplyActualStartResult {
@@ -59,52 +68,124 @@ export async function fetchProjectScheduleMeta(
   }
 }
 
+/**
+ * Ensure every task has immutable baseline_start/baseline_finish before rebuild.
+ * Snapshots planned dates only when the project has never been rescheduled.
+ */
+async function ensureImmutableBaselines(
+  supabase: SupabaseClient,
+  tasks: ProjectTask[],
+  hasPriorReschedule: boolean
+): Promise<{ tasks: ProjectTask[]; backfilled: number }> {
+  let backfilled = 0
+  const updatedTasks = tasks.map((task) => ({ ...task }))
+  const missingBaseline = updatedTasks.filter(
+    (t) => !toIsoDateOnly(t.baseline_start) || !toIsoDateOnly(t.baseline_finish)
+  )
+
+  if (missingBaseline.length === 0) {
+    return { tasks: updatedTasks, backfilled: 0 }
+  }
+
+  if (hasPriorReschedule) {
+    const names = missingBaseline.slice(0, 3).map((t) => t.name).join(', ')
+    throw new ScheduleRebuildError(
+      `${missingBaseline.length} task(s) lack immutable baseline dates (${names}${missingBaseline.length > 3 ? '…' : ''}). Re-import the MSP XML schedule to repair baselines.`
+    )
+  }
+
+  for (let i = 0; i < updatedTasks.length; i++) {
+    const task = updatedTasks[i]
+    if (toIsoDateOnly(task.baseline_start) && toIsoDateOnly(task.baseline_finish)) continue
+
+    if (!canSnapshotPlannedAsBaseline(task)) {
+      throw new ScheduleRebuildError(
+        `Task "${task.name}" has no baseline or planned dates. Re-import the MSP XML schedule.`
+      )
+    }
+
+    const snapshot = snapshotPlannedAsBaseline(task)
+    const { error } = await supabase
+      .from('project_tasks')
+      .update({
+        baseline_start: snapshot.baseline_start,
+        baseline_finish: snapshot.baseline_finish,
+      })
+      .eq('id', task.id)
+
+    if (error) {
+      if (error.code === '42703') {
+        throw new ScheduleRebuildError(
+          'Database is missing baseline_start/baseline_finish columns. Run migration 27-schedule-baseline-dates.sql in Supabase.'
+        )
+      }
+      throw new Error(error.message)
+    }
+
+    updatedTasks[i] = { ...task, ...snapshot }
+    backfilled++
+  }
+
+  return { tasks: updatedTasks, backfilled }
+}
+
 export async function applyActualStartToSchedule(
   supabase: SupabaseClient,
   input: ApplyActualStartInput
 ): Promise<ApplyActualStartResult> {
   const { projectId, actualStartDate, alignedWithBaseline } = input
 
-  const [{ data: tasks, error: tasksError }, { data: deps, error: depsError }, { data: projectRow }] =
-    await Promise.all([
+  const [{ data: tasks, error: tasksError }, { data: projectRow }] = await Promise.all([
       supabase.from('project_tasks').select('*').eq('project_id', projectId),
-      supabase.from('task_dependencies').select('*').eq('project_id', projectId),
-      supabase.from('projects').select('schedule_baseline_start').eq('id', projectId).maybeSingle(),
+      supabase
+        .from('projects')
+        .select('schedule_baseline_start, schedule_actual_start')
+        .eq('id', projectId)
+        .maybeSingle(),
     ])
 
   if (tasksError) throw new Error(tasksError.message)
-  if (depsError && depsError.code !== '42P01') throw new Error(depsError.message)
 
-  const rows = (tasks ?? []) as ProjectTask[]
-  const dependencies = (deps ?? []) as TaskDependency[]
+  let rows = (tasks ?? []) as ProjectTask[]
 
   if (rows.length === 0) {
     throw new Error('No tasks found — import MSP XML first')
   }
 
+  const hasPriorReschedule = Boolean(toIsoDateOnly(projectRow?.schedule_actual_start))
+  const { tasks: baselinedTasks, backfilled } = await ensureImmutableBaselines(
+    supabase,
+    rows,
+    hasPriorReschedule
+  )
+  rows = baselinedTasks
+
   const baselineStart =
     toIsoDateOnly(projectRow?.schedule_baseline_start) ??
     computeBaselineStartFromTasks(rows) ??
-    toIsoDateOnly(rows[0].start_planned) ??
+    toIsoDateOnly(rows[0].baseline_start) ??
     actualStartDate
 
-  const actualStart = alignedWithBaseline ? baselineStart : actualStartDate
-  const shiftDays = diffDaysIso(baselineStart, actualStart)
+  const actualStart = alignedWithBaseline ? baselineStart : toIsoDateOnly(actualStartDate) ?? actualStartDate
 
-  const rebuilt = rebuildScheduleFromProjectStart(actualStart, rows, dependencies, baselineStart)
+  const shifted = shiftScheduleByActualStart(actualStart, rows, baselineStart)
+  const shiftDays = shifted.deltaDays
 
   const today = new Date().toISOString().slice(0, 10)
   let tasksInProgress = 0
   let tasksCompleted = 0
   let tasksDelayed = 0
   let percentSum = 0
+  let tasksUpdated = 0
 
   for (const task of rows) {
     const pct = Number(task.percent_complete)
     percentSum += pct
 
-    const dates = rebuilt.taskDates.get(task.id)
-    if (!dates) continue
+    const dates = shifted.taskDates.get(task.id)
+    if (!dates) {
+      throw new ScheduleRebuildError(`Rebuild did not produce dates for task "${task.name}".`)
+    }
 
     const { error: updateError } = await supabase
       .from('project_tasks')
@@ -118,6 +199,7 @@ export async function applyActualStartToSchedule(
       .eq('id', task.id)
 
     if (updateError) throw new Error(updateError.message)
+    tasksUpdated++
 
     if (pct >= 100) tasksCompleted++
     else if (pct > 0) tasksInProgress++
@@ -154,12 +236,15 @@ export async function applyActualStartToSchedule(
     baseline_start: baselineStart,
     actual_start: actualStart,
     shift_days: shiftDays,
-    tasks_updated: rows.length,
+    delta_days: shiftDays,
+    tasks_updated: tasksUpdated,
     tasks_in_progress: tasksInProgress,
     tasks_completed: tasksCompleted,
     tasks_delayed: tasksDelayed,
     overall_percent: rows.length ? Math.round(percentSum / rows.length) : 0,
-    rebuilt_from_dependencies: dependencies.length > 0,
+    rebuilt_from_dependencies: false,
+    anchor_wbs: shifted.anchorWbs,
+    baseline_backfilled: backfilled > 0 ? backfilled : undefined,
   }
 
   return {
@@ -184,3 +269,5 @@ export async function setScheduleBaselineAfterImport(
   const { error } = await supabase.from('projects').update(payload).eq('id', projectId)
   if (error && error.code !== '42703') throw new Error(error.message)
 }
+
+export { ScheduleRebuildError }

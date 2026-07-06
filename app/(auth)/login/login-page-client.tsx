@@ -37,7 +37,16 @@ export default function LoginPage() {
     })
 
     if (signInError) {
-      setError(signInError.message)
+      const msg = signInError.message.toLowerCase()
+      if (msg.includes('fetch failed') || msg.includes('network')) {
+        setError(
+          'Cannot reach Supabase. Check internet/VPN, then restart the dev server (only one npm run dev on port 3000).'
+        )
+      } else if (msg.includes('invalid login credentials')) {
+        setError('Wrong email or password.')
+      } else {
+        setError(signInError.message)
+      }
       setLoading(false)
       return
     }

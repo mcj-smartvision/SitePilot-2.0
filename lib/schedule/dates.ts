@@ -113,13 +113,13 @@ export function shiftIsoTimestamp(iso: string | null, dayOffset: number): string
   return d.toISOString()
 }
 
-/** Earliest YYYY-MM-DD from task start dates. */
+/** Earliest YYYY-MM-DD from immutable baseline starts (falls back to planned only for legacy rows). */
 export function computeBaselineStartFromTasks(
-  tasks: Array<{ start_planned: string | null }>
+  tasks: Array<{ baseline_start?: string | null; start_planned?: string | null }>
 ): string | null {
   let min: string | null = null
   for (const task of tasks) {
-    const iso = toIsoDateOnly(task.start_planned)
+    const iso = toIsoDateOnly(task.baseline_start) ?? toIsoDateOnly(task.start_planned ?? null)
     if (!iso) continue
     if (!min || iso < min) min = iso
   }

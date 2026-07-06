@@ -25,20 +25,35 @@ export default function AdminProjectsPage() {
 
   useEffect(() => {
     let cancelled = false
+
     ;(async () => {
       try {
         setLoading(true)
-        await loadProjects()
+        setError(null)
+
+        const data = await Promise.race([
+          fetchAdminProjects(supabase),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Loading timed out — check Supabase connection and refresh the page.')),
+              15000
+            )
+          ),
+        ])
+
+        if (!cancelled) setProjects(data)
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load projects')
       } finally {
         if (!cancelled) setLoading(false)
       }
     })()
+
     return () => {
       cancelled = true
     }
-  }, [supabase])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once; supabase client is stable
+  }, [])
 
   async function handleCreate(input: CreateProjectInput) {
     const project = await createProject(supabase, input)

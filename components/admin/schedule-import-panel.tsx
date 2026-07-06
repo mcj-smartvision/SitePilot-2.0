@@ -56,8 +56,10 @@ export function ScheduleImportPanel({
   const [actualStart, setActualStart] = useState(initialActualStart)
   const [draftStart, setDraftStart] = useState<string | null>(null)
   const [baselineStart, setBaselineStart] = useState(scheduleBaselineStart)
+  const localRescheduleRef = useRef(false)
 
   useEffect(() => {
+    if (localRescheduleRef.current) return
     setTasks(sortTasks(previewTasks))
   }, [previewTasks])
 
@@ -81,6 +83,7 @@ export function ScheduleImportPanel({
 
   const handleRescheduled = useCallback(
     (payload: { tasks: ProjectTask[]; actualStart: string }) => {
+      localRescheduleRef.current = true
       if (payload.tasks.length > 0) {
         setTasks(sortTasks(payload.tasks))
       }
@@ -121,6 +124,7 @@ export function ScheduleImportPanel({
       setImportSuccess(
         `Imported ${data.tasks_imported} tasks and ${data.dependencies_imported} dependencies.`
       )
+      localRescheduleRef.current = false
       setBaselineStart(data.baseline_start ?? null)
       setActualStart(null)
       setDraftStart(null)

@@ -46,6 +46,8 @@ export interface SiteDailyReport {
   report_date: string
   site_supervisor_id: string
   raw_text: string
+  summary_text?: string | null
+  ai_status?: 'draft_by_ai' | 'confirmed_by_user' | 'rejected_by_user'
   ai_parsed: DailyReportAiParsed | null
   approved_by_manager: boolean
   approved_at: string | null

@@ -105,8 +105,8 @@ export function ActualStartPanel({
         </CardTitle>
         <CardDescription>
           {fa
-            ? 'تغییر این تاریخ، بازمحاسبهٔ سراسری برنامه را با حفظ مدت تسک‌ها و وابستگی‌ها انجام می‌دهد.'
-            : 'Changing this date rebuilds the full schedule from the new anchor, preserving durations and dependencies.'}
+            ? 'تاریخ جدید را وارد کنید: همهٔ تسک‌ها به‌اندازهٔ همان فاصله از baseline MSP جابه‌جا می‌شوند (بدون تغییر مدت).'
+            : 'Enter the new start: every task shifts by the same day offset from the MSP baseline (durations unchanged).'}
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-5 space-y-4">
@@ -170,10 +170,20 @@ export function ActualStartPanel({
                 ? `${updatedCount} از ${totalTasks} تسک به‌روزرسانی شد · شروع جدید: `
                 : `${updatedCount} of ${totalTasks} tasks updated · new start: `}
               <FormattedDate value={lastSuccess.actual_start} className="font-semibold" />
-              {lastSuccess.rebuilt_from_dependencies
+              {lastSuccess.delta_days != null ? (
+                fa
+                  ? ` · جابه‌جایی: ${lastSuccess.delta_days} روز`
+                  : ` · shift: ${lastSuccess.delta_days} day(s)`
+              ) : null}
+              {lastSuccess.anchor_wbs ? (
+                fa
+                  ? ` · لنگر: WBS ${lastSuccess.anchor_wbs}`
+                  : ` · anchor: WBS ${lastSuccess.anchor_wbs}`
+              ) : null}
+              {lastSuccess.baseline_backfilled
                 ? fa
-                  ? ' · با در نظر گرفتن وابستگی‌ها'
-                  : ' · dependency network honored'
+                  ? ` · ${lastSuccess.baseline_backfilled} baseline ذخیره شد`
+                  : ` · ${lastSuccess.baseline_backfilled} baselines snapshotted`
                 : null}
             </p>
           </div>

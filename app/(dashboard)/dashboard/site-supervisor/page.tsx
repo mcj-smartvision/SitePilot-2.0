@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { loadRolePageData } from '@/lib/dashboard/load-role-page'
 import { hasRoleDashboardAccess } from '@/lib/schedule/access'
-import { fetchProjectTasksForWeek } from '@/utils/schedule'
+import { fetchAllProjectTasks, fetchUnresolvedAlerts } from '@/utils/schedule'
 import { SiteSupervisorDashboard } from '@/components/schedule/site-supervisor-dashboard'
 
 export default async function SiteSupervisorPage() {
@@ -22,9 +22,12 @@ export default async function SiteSupervisorPage() {
   if (context.isFirstLogin) redirect('/first-login')
   if (!hasRoleDashboardAccess(context, 'site-supervisor')) redirect('/dashboard')
 
-  const tasks = activeProjectId
-    ? await fetchProjectTasksForWeek(supabase, activeProjectId)
-    : []
+  const [tasks, alerts] = activeProjectId
+    ? await Promise.all([
+        fetchAllProjectTasks(supabase, activeProjectId),
+        fetchUnresolvedAlerts(supabase, activeProjectId),
+      ])
+    : [[], []]
 
   return (
     <SiteSupervisorDashboard
@@ -33,6 +36,7 @@ export default async function SiteSupervisorPage() {
       projectOptions={projectOptions}
       initialProjectId={activeProjectId}
       initialTasks={tasks}
+      initialAlerts={alerts}
     />
   )
 }

@@ -1,55 +1,29 @@
-/** Load Leaflet + OpenStreetMap tiles (no API key required) */
+/** OpenStreetMap tiles + Nominatim geocoding (no API key required) */
 
-type LeafletModule = {
-  map: (el: HTMLElement) => LeafletMap
-  tileLayer: (url: string, opts: Record<string, unknown>) => { addTo: (map: LeafletMap) => void }
-  marker: (latlng: [number, number], opts?: { draggable?: boolean }) => LeafletMarker
-}
+import type { Map as LeafletMapType, Marker as LeafletMarkerType } from 'leaflet'
 
-type LeafletMap = {
-  setView: (latlng: [number, number], zoom: number) => LeafletMap
-  on: (event: string, handler: (e: { latlng: { lat: number; lng: number } }) => void) => void
-  invalidateSize: () => void
-}
+export type LeafletMap = LeafletMapType
+export type LeafletMarker = LeafletMarkerType
 
-type LeafletMarker = {
-  addTo: (map: LeafletMap) => LeafletMarker
-  setLatLng: (latlng: [number, number]) => void
-  getLatLng: () => { lat: number; lng: number }
-  on: (event: string, handler: () => void) => void
-}
+type LeafletModule = typeof import('leaflet')
 
 let leafletPromise: Promise<LeafletModule> | null = null
 
+/** Load Leaflet from npm bundle (works offline / without unpkg). */
 export function loadLeaflet(): Promise<LeafletModule> {
   if (typeof window === 'undefined') return Promise.reject(new Error('SSR'))
   if (leafletPromise) return leafletPromise
 
-  leafletPromise = new Promise((resolve, reject) => {
-    if (!document.querySelector('link[data-leaflet-css]')) {
-      const link = document.createElement('link')
-      link.rel = 'stylesheet'
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-      link.dataset.leafletCss = 'true'
-      document.head.appendChild(link)
-    }
+  leafletPromise = import('leaflet').then(async (L) => {
+    await import('leaflet/dist/leaflet.css')
 
-    const win = window as Window & { L?: LeafletModule }
-    if (win.L) {
-      resolve(win.L)
-      return
-    }
+    // Webpack/Next.js breaks default marker asset paths.
+    const iconRetinaUrl = (await import('leaflet/dist/images/marker-icon-2x.png')).default.src
+    const iconUrl = (await import('leaflet/dist/images/marker-icon.png')).default.src
+    const shadowUrl = (await import('leaflet/dist/images/marker-shadow.png')).default.src
+    L.default.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl })
 
-    const script = document.createElement('script')
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-    script.async = true
-    script.dataset.leaflet = 'true'
-    script.onload = () => {
-      if (win.L) resolve(win.L)
-      else reject(new Error('Leaflet failed to load'))
-    }
-    script.onerror = () => reject(new Error('Leaflet failed to load'))
-    document.head.appendChild(script)
+    return L
   })
 
   return leafletPromise
@@ -86,5 +60,3 @@ export async function nominatimReverse(lat: number, lng: number): Promise<{
     country,
   }
 }
-
-export type { LeafletMap, LeafletMarker, LeafletModule }

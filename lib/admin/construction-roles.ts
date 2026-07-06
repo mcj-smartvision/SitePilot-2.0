@@ -75,6 +75,19 @@ export const ROLE_DASHBOARD_PREVIEWS: RoleDashboardPreview[] = [
     alerts: ['Crane lift at 14:00 — Zone B', 'Concrete delivery rescheduled'],
   },
   {
+    key: 'site_supervisor',
+    title: 'Site Supervisor',
+    color: 'border-l-zinc-600',
+    summary: 'Today\'s operations, daily reports, and field actions',
+    metrics: [
+      { label: 'Today\'s activities', value: '12', trend: 'neutral' },
+      { label: 'Critical tasks', value: '3', trend: 'warning' },
+      { label: 'Readiness', value: '78%', trend: 'up' },
+      { label: 'AI drafts', value: '2 pending', trend: 'warning' },
+    ],
+    alerts: ['Formwork delay — Level 2', 'Purchase request awaiting approval'],
+  },
+  {
     key: 'hse_officer',
     title: 'HSE Officer',
     color: 'border-l-amber-600',

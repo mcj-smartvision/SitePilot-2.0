@@ -14,7 +14,7 @@ import {
   parseLatLng,
   parsePlaceResult,
 } from '@/lib/maps/geocoding'
-import { loadLeaflet, nominatimReverse, nominatimSearch, type LeafletMap, type LeafletMarker, type LeafletModule } from '@/lib/maps/openstreetmap'
+import { loadLeaflet, nominatimReverse, nominatimSearch, type LeafletMap, type LeafletMarker } from '@/lib/maps/openstreetmap'
 import type { ProjectInitializationFormValues } from '@/lib/project-init/schema'
 import { useProjectFormI18n } from './ProjectFormI18n'
 import { SearchableSelectField } from './FormFields'
@@ -132,18 +132,21 @@ export function SiteLocationPicker({ className }: { className?: string }) {
 
   handleOsmReverseRef.current = handleOsmReverse
 
+  const leafletRef = useRef<Awaited<ReturnType<typeof loadLeaflet>> | null>(null)
+
   const updateOsmMarker = useCallback((lat: number, lng: number) => {
-    if (!osmMapRef.current) return
-    const L = (window as unknown as { L: { marker: (ll: [number, number], o?: { draggable?: boolean }) => LeafletMarker } }).L
+    const map = osmMapRef.current
+    const L = leafletRef.current
+    if (!map || !L) return
     if (osmMarkerRef.current) osmMarkerRef.current.setLatLng([lat, lng])
     else {
-      osmMarkerRef.current = L.marker([lat, lng], { draggable: true }).addTo(osmMapRef.current)
+      osmMarkerRef.current = L.marker([lat, lng], { draggable: true }).addTo(map)
       osmMarkerRef.current.on('dragend', () => {
         const pos = osmMarkerRef.current?.getLatLng()
         if (pos) void handleOsmReverseRef.current(pos.lat, pos.lng)
       })
     }
-    osmMapRef.current.setView([lat, lng], 16)
+    map.setView([lat, lng], 16)
   }, [])
 
   const reverseGeocodeGoogle = useCallback(
@@ -221,8 +224,9 @@ export function SiteLocationPicker({ className }: { className?: string }) {
       }
 
       try {
-        await loadLeaflet()
+        const L = await loadLeaflet()
         if (cancelled) return
+        leafletRef.current = L
         setMapProvider('osm')
         setMapsReady(true)
       } catch {
@@ -280,8 +284,9 @@ export function SiteLocationPicker({ className }: { className?: string }) {
     }
 
     if (mapProvider === 'osm') {
+      const L = leafletRef.current
+      if (!L || !mapContainerRef.current) return
       mapInitializedRef.current = true
-      const L = (window as unknown as { L: LeafletModule }).L
       const map = L.map(mapContainerRef.current).setView([mapCenter.lat, mapCenter.lng], mapZoom)
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap',

@@ -120,7 +120,10 @@ export async function importMspScheduleToProject(
 
     const baseline_start =
       computeBaselineStartFromTasks(
-        parsed.tasks.map((t) => ({ start_planned: t.start_planned }))
+        parsed.tasks.map((t) => ({
+          baseline_start: t.start_planned,
+          start_planned: t.start_planned,
+        }))
       ) ?? new Date().toISOString().slice(0, 10)
 
     await setScheduleBaselineAfterImport(supabase, projectId, baseline_start)
