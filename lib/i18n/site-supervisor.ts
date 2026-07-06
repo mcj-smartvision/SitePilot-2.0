@@ -68,9 +68,11 @@ const EN = {
   status: 'Status',
   open: 'Open',
   closed: 'Closed',
-} as const
+}
 
-const FA = {
+export type SiteSupervisorMessages = typeof EN
+
+const FA: SiteSupervisorMessages = {
   title: 'داشبورد سرپرست کارگاه',
   description: 'پایش عملیات امروز، ثبت گزارش و ارسال دستورات تأییدشده به ذینفعان.',
   progressVsPlan: 'پیشرفت در برابر برنامه',
@@ -138,11 +140,9 @@ const FA = {
   status: 'وضعیت',
   open: 'باز',
   closed: 'بسته',
-} as const
+}
 
-export type SiteSupervisorMessages = typeof EN
-
-export function getSiteSupervisorMessages(locale: FormLocale): typeof EN {
-  if (locale === 'fa' || locale === 'ar') return FA as typeof EN
+export function getSiteSupervisorMessages(locale: FormLocale): SiteSupervisorMessages {
+  if (locale === 'fa' || locale === 'ar') return FA
   return EN
 }
