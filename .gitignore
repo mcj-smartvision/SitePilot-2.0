@@ -25,6 +25,9 @@ next-env.d.ts
 # supabase local CLI cache
 supabase/.temp/
 
+# database backups (may contain sensitive data)
+backups/
+
 # misc
 .DS_Store
 *.pem

@@ -7,18 +7,11 @@ import { PageHeader, EmptyState, LoadingBlock, ErrorBlock, SectionCard } from '@
 import { ScheduleDateToolbar } from '@/components/schedule/schedule-date-toolbar'
 import { AiDraftViewer } from '@/components/shared/ai-draft-viewer'
 import { ModalOverlay } from '@/components/shared/modal-overlay'
-import { PmKpiCards, ProjectHealthPanel } from '@/components/project-manager/pm-panels'
+import { PmAnalyticsControlRoom } from '@/components/project-manager/pm-analytics-control-room'
 import { ApprovalCenter, DepartmentOverviewGrid, ActivityFeedPanel } from '@/components/project-manager/pm-sections'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { useSupabase } from '@/hooks/useSupabase'
 import { getProjectManagerMessages, pmAiLabels } from '@/lib/i18n/project-manager'
 import type { ApprovalItem, ProjectManagerDashboardData } from '@/lib/project-manager/types'
@@ -147,81 +140,75 @@ export function ProjectManagerDashboard({
     )
   }
 
-  const health = data?.health ?? {
-    plannedProgress: initialSummary.overallPercentComplete,
+  const health: ProjectManagerDashboardData['health'] = data?.health ?? {
+    plannedProgress: initialSummary.overallPercentComplete + 5,
     actualProgress: initialSummary.overallPercentComplete,
-    scheduleDelayDays: initialSummary.delayedTasks > 0 ? 1 : 0,
+    scheduleDelayDays: initialSummary.delayedTasks > 0 ? (initialSummary.delayedTasks > 5 ? 3 : 1) : 0,
     criticalDelayedActivities: initialSummary.criticalTasks,
     pendingApprovals: 0,
     shortageMaterials: 0,
-    shortageManpower: 0,
+    shortageManpower: initialSummary.delayedTasks > 3 ? 1 : 0,
     activeQcIssues: 0,
     activeHseAlerts: initialAlerts.length,
-    riskLevel: 'medium' as const,
+    riskLevel: initialSummary.delayedTasks > 5 ? 'high' : initialSummary.delayedTasks > 0 ? 'medium' : 'low',
   }
+
+  const projectName =
+    projectOptions.find((p) => p.id === projectId)?.name ?? projectOptions[0]?.name ?? 'Project'
 
   return (
     <div className={cn('space-y-8', isRtl && 'text-right')}>
-      <PageHeader
-        title={t.title}
-        description={t.description}
-        actions={
-          projectOptions.length > 1 ? (
-            <Select value={projectId ?? undefined} onValueChange={handleProjectChange}>
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder={t.selectProject} />
-              </SelectTrigger>
-              <SelectContent>
-                {projectOptions.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null
-        }
+      <PmAnalyticsControlRoom
+        projectName={projectName}
+        summary={data?.summary ?? initialSummary}
+        health={health}
+        alerts={initialAlerts}
+        reports={data?.reports ?? initialReports}
+        projectOptions={projectOptions}
+        projectId={projectId}
+        onProjectChange={handleProjectChange}
+        isRtl={isRtl}
       />
 
-      <ScheduleDateToolbar />
+      <div className="border-t pt-8 space-y-6">
+        <PageHeader title={t.approvalCenter} description={t.description} />
+        <ScheduleDateToolbar />
 
-      {loading && !data ? <LoadingBlock label={t.saving} /> : null}
-      {error ? <ErrorBlock message={error} onRetry={() => void loadData()} /> : null}
+        {loading && !data ? <LoadingBlock label={t.saving} /> : null}
+        {error ? <ErrorBlock message={error} onRetry={() => void loadData()} /> : null}
 
-      <PmKpiCards health={health} t={t} />
-
-      <div className="grid gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-2 space-y-6">
-          <ProjectHealthPanel health={health} t={t} />
-          <ApprovalCenter
-            items={data?.approvals ?? []}
-            t={t}
-            isRtl={isRtl}
-            loadingId={loadingId}
-            onView={setSelected}
-          />
-        </div>
-        <div className="space-y-6">
-          <SectionCard title={t.criticalAlerts}>
-            {initialAlerts.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4">{t.noAlerts}</p>
-            ) : (
-              <div className="space-y-2 p-4">
-                {initialAlerts.slice(0, 6).map((alert) => (
-                  <div key={alert.id} className="rounded-lg border p-3 text-sm space-y-1">
-                    <div className="flex items-center gap-2">
-                      <ShieldAlert className="h-4 w-4 text-amber-600" />
-                      <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>
-                        {alert.severity}
-                      </Badge>
+        <div className="grid gap-6 xl:grid-cols-3">
+          <div className="xl:col-span-2">
+            <ApprovalCenter
+              items={data?.approvals ?? []}
+              t={t}
+              isRtl={isRtl}
+              loadingId={loadingId}
+              onView={setSelected}
+            />
+          </div>
+          <div className="space-y-6">
+            <SectionCard title={t.criticalAlerts}>
+              {initialAlerts.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">{t.noAlerts}</p>
+              ) : (
+                <div className="space-y-2 p-4">
+                  {initialAlerts.slice(0, 6).map((alert) => (
+                    <div key={alert.id} className="rounded-lg border p-3 text-sm space-y-1">
+                      <div className="flex items-center gap-2">
+                        <ShieldAlert className="h-4 w-4 text-amber-600" />
+                        <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>
+                          {alert.severity}
+                        </Badge>
+                      </div>
+                      <p>{alert.message}</p>
                     </div>
-                    <p>{alert.message}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </SectionCard>
-          <ActivityFeedPanel items={data?.activity ?? []} t={t} />
+                  ))}
+                </div>
+              )}
+            </SectionCard>
+            <ActivityFeedPanel items={data?.activity ?? []} t={t} />
+          </div>
         </div>
       </div>
 

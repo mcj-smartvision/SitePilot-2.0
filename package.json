@@ -8,7 +8,9 @@
     "dev:clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\" && next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "backup": "node scripts/backup.mjs",
+    "backup:db": "node scripts/backup.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -34,6 +36,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.2",
+    "recharts": "^3.9.2",
     "tailwind-merge": "^2.6.0",
     "tailwindcss": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
