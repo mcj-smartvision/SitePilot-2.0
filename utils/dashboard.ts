@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { blockCodeForLegacyWidget } from '@/lib/dashboard/ui-block-catalog'
+import { resolveVisibleUiBlockCodes } from '@/lib/dashboard/resolve-ui-block-visibility'
 import { getWidgetsForRole } from '@/lib/dashboard/roles'
 import type { SiteRoleKey } from '@/lib/dashboard/roles'
 import type { DashboardWidget } from '@/types/admin'
@@ -16,6 +18,24 @@ function normalizeWidget(
   return widget
 }
 
+async function applyUiBlockFilter(
+  supabase: SupabaseClient,
+  positionIds: string[],
+  widgetKeys: string[]
+): Promise<string[]> {
+  if (positionIds.length === 0) return widgetKeys
+  try {
+    const uiCodes = await resolveVisibleUiBlockCodes(supabase, positionIds, { dashboard: 'general' })
+    return widgetKeys.filter((key) => {
+      const code = blockCodeForLegacyWidget(key)
+      if (!code) return true
+      return uiCodes.has(code)
+    })
+  } catch {
+    return widgetKeys
+  }
+}
+
 export async function resolveVisibleWidgetKeys(
   supabase: SupabaseClient,
   _projectId: string,
@@ -24,14 +44,16 @@ export async function resolveVisibleWidgetKeys(
 ): Promise<string[]> {
   const fallback = getWidgetsForRole(primaryRole)
 
-  if (positionIds.length === 0) return fallback
+  if (positionIds.length === 0) return applyUiBlockFilter(supabase, positionIds, fallback)
 
   const { data: assignments, error } = await supabase
     .from('position_dashboard_widgets')
     .select('is_visible, widget:dashboard_widgets(key, is_active, sort_order)')
     .in('position_id', positionIds)
 
-  if (error || !assignments?.length) return fallback
+  if (error || !assignments?.length) {
+    return applyUiBlockFilter(supabase, positionIds, fallback)
+  }
 
   const visibleFromDb = (assignments as unknown as WidgetAssignmentRow[])
     .filter((row) => {
@@ -40,7 +62,9 @@ export async function resolveVisibleWidgetKeys(
     })
     .map((row) => normalizeWidget(row.widget)!.key)
 
-  if (visibleFromDb.length === 0) return fallback
+  if (visibleFromDb.length === 0) {
+    return applyUiBlockFilter(supabase, positionIds, fallback)
+  }
 
   const { data: allWidgets } = await supabase
     .from('dashboard_widgets')
@@ -51,9 +75,11 @@ export async function resolveVisibleWidgetKeys(
   const orderMap = new Map((allWidgets ?? []).map((w: DashboardWidget) => [w.key, w.sort_order]))
   const roleAllowed = new Set(fallback)
 
-  return [...new Set(visibleFromDb)]
+  const widgetKeys = [...new Set(visibleFromDb)]
     .filter((key) => roleAllowed.has(key) || primaryRole === 'project_manager')
     .sort((a, b) => (orderMap.get(a) ?? 999) - (orderMap.get(b) ?? 999))
+
+  return applyUiBlockFilter(supabase, positionIds, widgetKeys)
 }
 
 export async function fetchDashboardStats(

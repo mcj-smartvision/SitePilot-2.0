@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "backup": "node scripts/backup.mjs",
-    "backup:db": "node scripts/backup.mjs"
+    "backup:db": "node scripts/backup.mjs",
+    "generate:ui-blocks-sql": "node scripts/generate-ui-blocks-sql.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

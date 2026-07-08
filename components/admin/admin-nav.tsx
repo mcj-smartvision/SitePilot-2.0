@@ -136,7 +136,7 @@ export function ProjectAdminNav({ projectId, projectName }: ProjectNavProps) {
     { href: `${base}/positions`, label: 'Positions' },
     { href: `${base}/schedule`, label: 'Schedule' },
     { href: `${base}/routing`, label: 'Notifications' },
-    { href: `${base}/widgets`, label: 'Widgets' },
+    { href: `${base}/widgets`, label: 'Visibility' },
   ]
 
   return (

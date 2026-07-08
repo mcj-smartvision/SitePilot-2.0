@@ -47,6 +47,8 @@ import { buildExecutiveSummary, phaseLabelFa } from '@/lib/managerial/build-exec
 import { ExecutiveLayer } from '@/components/managerial/executive-layer'
 import { ActionNowBox } from '@/components/managerial/action-now-box'
 import { RecentReportsPanel } from '@/components/managerial/recent-reports-panel'
+import { UiBlockGuard } from '@/components/dashboard/ui-block-visibility'
+import { PM_KPI_BLOCK_CODE } from '@/lib/dashboard/ui-block-catalog'
 import type { ProjectHealthStatus } from '@/lib/project-manager/types'
 import type { ProjectAlert, ProjectScheduleSummary, SiteDailyReport } from '@/types/schedule'
 import { cn } from '@/lib/utils'
@@ -228,7 +230,9 @@ export function PmAnalyticsControlRoom({
     <div className={cn('space-y-8', isRtl && 'text-right')} dir="rtl">
       <ExecutiveLayer summary={executive} projectName={projectName} phaseFa={phaseFa} />
 
-      <ActionNowBox actions={executive.prioritizedActions} />
+      <UiBlockGuard code="PM-ACT-01">
+        <ActionNowBox actions={executive.prioritizedActions} />
+      </UiBlockGuard>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/30 px-4 py-3">
         <p className="text-sm font-semibold">لایه ۲ — جزئیات تحلیلی</p>
@@ -263,13 +267,16 @@ export function PmAnalyticsControlRoom({
 
       <div className="grid gap-4 md:grid-cols-3">
         {analytics.kpis.map((kpi) => (
-          <KpiAnalyticsCard key={kpi.key} kpi={kpi} />
+          <UiBlockGuard key={kpi.key} code={PM_KPI_BLOCK_CODE[kpi.key] ?? 'PM-KPI-01'}>
+            <KpiAnalyticsCard kpi={kpi} />
+          </UiBlockGuard>
         ))}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2 space-y-6">
-          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+          <UiBlockGuard code="PM-CHT-01">
+            <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="mb-4">
               <h3 className="font-semibold flex items-center gap-2">
                 <Activity className="h-5 w-5 text-primary" />
@@ -302,7 +309,9 @@ export function PmAnalyticsControlRoom({
               اگر WSI و MRS همزمان نزولی باشند، احتمال تأخیر زنجیره‌ای در اجرا بالاست — با سرپرست کارگاه هماهنگ کنید.
             </p>
           </div>
+          </UiBlockGuard>
 
+          <UiBlockGuard code="PM-CHT-02">
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="mb-4">
               <h3 className="font-semibold flex items-center gap-2">
@@ -328,11 +337,15 @@ export function PmAnalyticsControlRoom({
               فاصله زیاد بین ستون‌ها در یک زون یعنی انحراف اجرایی — اولویت بازبینی منابع در همان زون.
             </p>
           </div>
+          </UiBlockGuard>
 
-          <RecentReportsPanel reports={reports} />
+          <UiBlockGuard code="PM-TBL-02">
+            <RecentReportsPanel reports={reports} />
+          </UiBlockGuard>
         </div>
 
         <div className="space-y-6">
+          <UiBlockGuard code="PM-CHT-03">
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <h3 className="font-semibold mb-1">آمادگی کلی پروژه</h3>
             <p className="text-xs text-muted-foreground mb-4">ترکیب نیرو، مصالح و زمان‌بندی</p>
@@ -372,9 +385,14 @@ export function PmAnalyticsControlRoom({
               بخش «حاشیه ریسک» هرچه بزرگ‌تر = فاصله بیشتر از وضعیت پایدار.
             </p>
           </div>
+          </UiBlockGuard>
 
-          <RiskAlertsPanel data={analytics} />
-          <InsightsPanel data={analytics} />
+          <UiBlockGuard code="PM-PNL-04">
+            <RiskAlertsPanel data={analytics} />
+          </UiBlockGuard>
+          <UiBlockGuard code="PM-PNL-05">
+            <InsightsPanel data={analytics} />
+          </UiBlockGuard>
         </div>
       </div>
 

@@ -9,6 +9,7 @@ import { AiDraftViewer } from '@/components/shared/ai-draft-viewer'
 import { ModalOverlay } from '@/components/shared/modal-overlay'
 import { PmAnalyticsControlRoom } from '@/components/project-manager/pm-analytics-control-room'
 import { ApprovalCenter, DepartmentOverviewGrid, ActivityFeedPanel } from '@/components/project-manager/pm-sections'
+import { UiBlockGuard, UiBlockVisibilityProvider, AdminUiBlockCatalogPanel } from '@/components/dashboard/ui-block-visibility'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -34,6 +35,7 @@ interface ProjectManagerDashboardProps {
   initialSummary: ProjectScheduleSummary
   initialReports: SiteDailyReport[]
   initialAlerts: ProjectAlert[]
+  visibleBlockCodes?: string[]
 }
 
 export function ProjectManagerDashboard({
@@ -43,6 +45,7 @@ export function ProjectManagerDashboard({
   initialSummary,
   initialReports,
   initialAlerts,
+  visibleBlockCodes = [],
 }: ProjectManagerDashboardProps) {
   const supabase = useSupabase()
   const router = useRouter()
@@ -157,62 +160,76 @@ export function ProjectManagerDashboard({
     projectOptions.find((p) => p.id === projectId)?.name ?? projectOptions[0]?.name ?? 'Project'
 
   return (
-    <div className={cn('space-y-8', isRtl && 'text-right')}>
-      <PmAnalyticsControlRoom
-        projectName={projectName}
-        summary={data?.summary ?? initialSummary}
-        health={health}
-        alerts={initialAlerts}
-        reports={data?.reports ?? initialReports}
-        projectOptions={projectOptions}
-        projectId={projectId}
-        onProjectChange={handleProjectChange}
-        isRtl={isRtl}
-      />
+    <UiBlockVisibilityProvider
+      visibleCodes={visibleBlockCodes}
+      showAdminBlockCodes={initialContext.isSystemAdmin}
+    >
+      <div className={cn('space-y-8', isRtl && 'text-right')}>
+        <AdminUiBlockCatalogPanel dashboard="project-manager" />
 
-      <div className="border-t pt-8 space-y-6">
-        <PageHeader title={t.approvalCenter} description={t.description} />
-        <ScheduleDateToolbar />
+        <PmAnalyticsControlRoom
+          projectName={projectName}
+          summary={data?.summary ?? initialSummary}
+          health={health}
+          alerts={initialAlerts}
+          reports={data?.reports ?? initialReports}
+          projectOptions={projectOptions}
+          projectId={projectId}
+          onProjectChange={handleProjectChange}
+          isRtl={isRtl}
+        />
 
-        {loading && !data ? <LoadingBlock label={t.saving} /> : null}
-        {error ? <ErrorBlock message={error} onRetry={() => void loadData()} /> : null}
+        <UiBlockGuard code="PM-TBL-01">
+          <div className="border-t pt-8 space-y-6">
+            <PageHeader title={t.approvalCenter} description={t.description} />
+            <ScheduleDateToolbar />
 
-        <div className="grid gap-6 xl:grid-cols-3">
-          <div className="xl:col-span-2">
-            <ApprovalCenter
-              items={data?.approvals ?? []}
-              t={t}
-              isRtl={isRtl}
-              loadingId={loadingId}
-              onView={setSelected}
-            />
-          </div>
-          <div className="space-y-6">
-            <SectionCard title={t.criticalAlerts}>
-              {initialAlerts.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">{t.noAlerts}</p>
-              ) : (
-                <div className="space-y-2 p-4">
-                  {initialAlerts.slice(0, 6).map((alert) => (
-                    <div key={alert.id} className="rounded-lg border p-3 text-sm space-y-1">
-                      <div className="flex items-center gap-2">
-                        <ShieldAlert className="h-4 w-4 text-amber-600" />
-                        <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>
-                          {alert.severity}
-                        </Badge>
+            {loading && !data ? <LoadingBlock label={t.saving} /> : null}
+            {error ? <ErrorBlock message={error} onRetry={() => void loadData()} /> : null}
+
+            <div className="grid gap-6 xl:grid-cols-3">
+              <div className="xl:col-span-2">
+                <ApprovalCenter
+                  items={data?.approvals ?? []}
+                  t={t}
+                  isRtl={isRtl}
+                  loadingId={loadingId}
+                  onView={setSelected}
+                />
+              </div>
+              <div className="space-y-6">
+                <UiBlockGuard code="PM-PNL-06">
+                  <SectionCard title={t.criticalAlerts}>
+                    {initialAlerts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4">{t.noAlerts}</p>
+                    ) : (
+                      <div className="space-y-2 p-4">
+                        {initialAlerts.slice(0, 6).map((alert) => (
+                          <div key={alert.id} className="rounded-lg border p-3 text-sm space-y-1">
+                            <div className="flex items-center gap-2">
+                              <ShieldAlert className="h-4 w-4 text-amber-600" />
+                              <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>
+                                {alert.severity}
+                              </Badge>
+                            </div>
+                            <p>{alert.message}</p>
+                          </div>
+                        ))}
                       </div>
-                      <p>{alert.message}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SectionCard>
-            <ActivityFeedPanel items={data?.activity ?? []} t={t} />
+                    )}
+                  </SectionCard>
+                </UiBlockGuard>
+                <UiBlockGuard code="PM-PNL-07">
+                  <ActivityFeedPanel items={data?.activity ?? []} t={t} />
+                </UiBlockGuard>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </UiBlockGuard>
 
-      <DepartmentOverviewGrid departments={data?.departments ?? []} t={t} />
+        <UiBlockGuard code="PM-PNL-08">
+          <DepartmentOverviewGrid departments={data?.departments ?? []} t={t} />
+        </UiBlockGuard>
 
       <ModalOverlay open={!!selected} onClose={() => setSelected(null)} title={selected?.title ?? t.approvalCenter}>
         {selected ? (
@@ -251,6 +268,7 @@ export function ProjectManagerDashboard({
           </div>
         ) : null}
       </ModalOverlay>
-    </div>
+      </div>
+    </UiBlockVisibilityProvider>
   )
 }

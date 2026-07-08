@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { loadRolePageData } from '@/lib/dashboard/load-role-page'
+import { loadUiBlockVisibility } from '@/lib/dashboard/load-ui-block-visibility'
 import { hasRoleDashboardAccess } from '@/lib/schedule/access'
 import {
   fetchProjectScheduleSummary,
@@ -45,6 +46,13 @@ export default async function ProjectManagerPage() {
         [],
       ]
 
+  const visibleBlockCodes = await loadUiBlockVisibility(
+    supabase,
+    context,
+    activeProjectId,
+    'project-manager'
+  )
+
   return (
     <ProjectManagerDashboard
       key={activeProjectId ?? 'no-project'}
@@ -54,6 +62,7 @@ export default async function ProjectManagerPage() {
       initialSummary={summary}
       initialReports={reports}
       initialAlerts={alerts}
+      visibleBlockCodes={visibleBlockCodes}
     />
   )
 }

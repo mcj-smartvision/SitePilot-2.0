@@ -52,6 +52,11 @@ import {
   updateAiActionText,
 } from '@/utils/supervisor/dashboard'
 import { cn } from '@/lib/utils'
+import {
+  AdminUiBlockCatalogPanel,
+  UiBlockGuard,
+  UiBlockVisibilityProvider,
+} from '@/components/dashboard/ui-block-visibility'
 
 interface SiteSupervisorDashboardProps {
   initialContext: DashboardUserContext
@@ -59,6 +64,7 @@ interface SiteSupervisorDashboardProps {
   initialProjectId: string | null
   initialTasks: ProjectTask[]
   initialAlerts: ProjectAlert[]
+  visibleBlockCodes?: string[]
 }
 
 type ActionDialog = 'purchase' | 'pm_comment' | 'hse_alert' | 'instruction' | null
@@ -69,6 +75,7 @@ export function SiteSupervisorDashboard({
   initialProjectId,
   initialTasks,
   initialAlerts,
+  visibleBlockCodes = [],
 }: SiteSupervisorDashboardProps) {
   const supabase = useSupabase()
   const { locale, dir } = useLocale()
@@ -213,7 +220,13 @@ export function SiteSupervisorDashboard({
   }
 
   return (
-    <div className={cn('space-y-8', isRtl && 'text-right')}>
+    <UiBlockVisibilityProvider
+      visibleCodes={visibleBlockCodes}
+      showAdminBlockCodes={initialContext.isSystemAdmin}
+    >
+      <div className={cn('space-y-8', isRtl && 'text-right')}>
+        <AdminUiBlockCatalogPanel dashboard="site-supervisor" />
+
       <PageHeader
         title={t.title}
         description={t.description}
@@ -240,47 +253,58 @@ export function SiteSupervisorDashboard({
       {loading && tasks.length === 0 ? <LoadingBlock label={t.saving} /> : null}
       {error ? <ErrorBlock message={error} onRetry={() => void loadData()} /> : null}
 
-      <SupervisorSummaryCards kpis={kpis} labels={t} />
+      <UiBlockGuard code="SS-KPI-01">
+        <SupervisorSummaryCards kpis={kpis} labels={t} />
+      </UiBlockGuard>
 
-      <TodayActivitiesTable
-        activities={todayActivities}
-        labels={t}
-        isRtl={isRtl}
-        onOpenQuickReport={(id) => {
-          const act = todayActivities.find((a) => a.id === id) ?? null
-          setQuickReportActivity(act)
-        }}
-        onCreateInstruction={(id) => {
-          setActionTaskId(id)
-          setInstructionText('')
-          setGeneratedAction(null)
-          setActionDialog('instruction')
-        }}
-      />
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <LookaheadPanel activities={lookahead} labels={t} isRtl={isRtl} />
-        <IssuesAlertsPanel
-          issues={issues}
+      <UiBlockGuard code="SS-TBL-01">
+        <TodayActivitiesTable
+          activities={todayActivities}
           labels={t}
-          onDraftPmComment={(issueId) => {
-            const issue = issues.find((i) => i.id === issueId)
-            setPmNote(issue?.description ?? '')
+          isRtl={isRtl}
+          onOpenQuickReport={(id) => {
+            const act = todayActivities.find((a) => a.id === id) ?? null
+            setQuickReportActivity(act)
+          }}
+          onCreateInstruction={(id) => {
+            setActionTaskId(id)
+            setInstructionText('')
             setGeneratedAction(null)
-            setActionDialog('pm_comment')
+            setActionDialog('instruction')
           }}
         />
+      </UiBlockGuard>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <UiBlockGuard code="SS-PNL-01">
+          <LookaheadPanel activities={lookahead} labels={t} isRtl={isRtl} />
+        </UiBlockGuard>
+        <UiBlockGuard code="SS-PNL-03">
+          <IssuesAlertsPanel
+            issues={issues}
+            labels={t}
+            onDraftPmComment={(issueId) => {
+              const issue = issues.find((i) => i.id === issueId)
+              setPmNote(issue?.description ?? '')
+              setGeneratedAction(null)
+              setActionDialog('pm_comment')
+            }}
+          />
+        </UiBlockGuard>
       </div>
 
-      <ResourcesPanel
-        resources={resources}
-        labels={t}
-        onRequestPurchase={() => {
-          setGeneratedAction(null)
-          setActionDialog('purchase')
-        }}
-      />
+      <UiBlockGuard code="SS-PNL-02">
+        <ResourcesPanel
+          resources={resources}
+          labels={t}
+          onRequestPurchase={() => {
+            setGeneratedAction(null)
+            setActionDialog('purchase')
+          }}
+        />
+      </UiBlockGuard>
 
+      <UiBlockGuard code="SS-PNL-04">
       <SectionCard
         title={t.aiActions}
         action={
@@ -325,7 +349,9 @@ export function SiteSupervisorDashboard({
           </div>
         )}
       </SectionCard>
+      </UiBlockGuard>
 
+      <UiBlockGuard code="SS-ACT-01">
       <QuickReportDialog
         open={!!quickReportActivity}
         onClose={() => setQuickReportActivity(null)}
@@ -347,6 +373,7 @@ export function SiteSupervisorDashboard({
           await rejectDailyReportDraft(supabase, reportId, initialContext.userId)
         }}
       />
+      </UiBlockGuard>
 
       <ModalOverlay
         open={actionDialog !== null}
@@ -461,6 +488,7 @@ export function SiteSupervisorDashboard({
           />
         )}
       </ModalOverlay>
-    </div>
+      </div>
+    </UiBlockVisibilityProvider>
   )
 }

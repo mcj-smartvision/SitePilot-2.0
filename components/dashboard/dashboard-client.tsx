@@ -8,7 +8,13 @@ import { RoleDashboard } from '@/components/dashboard/role-dashboard'
 import { LoadingBlock, ErrorBlock } from '@/components/admin/shared'
 import type { DashboardUserContext } from '@/types/dashboard'
 
-export function DashboardClient({ initialContext }: { initialContext: DashboardUserContext }) {
+export function DashboardClient({
+  initialContext,
+  visibleBlockCodes = [],
+}: {
+  initialContext: DashboardUserContext
+  visibleBlockCodes?: string[]
+}) {
   const supabase = useSupabase()
   const [context, setContext] = useState(initialContext)
   const [widgetKeys, setWidgetKeys] = useState<string[]>([])
@@ -68,6 +74,8 @@ export function DashboardClient({ initialContext }: { initialContext: DashboardU
     <RoleDashboard
       context={{ user: context, projectId: context.activeProjectId }}
       widgetKeys={widgetKeys}
+      visibleBlockCodes={visibleBlockCodes}
+      showAdminBlockCodes={context.isSystemAdmin}
       onProjectChange={handleProjectChange}
     />
   )

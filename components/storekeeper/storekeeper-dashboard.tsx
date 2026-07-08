@@ -32,6 +32,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import {
+  AdminUiBlockCatalogPanel,
+  UiBlockGuard,
+  UiBlockVisibilityProvider,
+} from '@/components/dashboard/ui-block-visibility'
 import { getStorekeeperMessages } from '@/lib/i18n/storekeeper'
 import { writeProjectCookie } from '@/lib/project/project-cookie'
 import type { ExtractedInvoiceLine } from '@/lib/storekeeper/types'
@@ -54,6 +59,7 @@ interface StorekeeperDashboardProps {
   initialContext: DashboardUserContext
   projectOptions?: { id: string; name: string }[]
   initialProjectId?: string | null
+  visibleBlockCodes?: string[]
 }
 
 function newExtractedRow(): ExtractedInvoiceLine {
@@ -77,6 +83,7 @@ export function StorekeeperDashboard({
   initialContext,
   projectOptions: projectOptionsProp,
   initialProjectId,
+  visibleBlockCodes = [],
 }: StorekeeperDashboardProps) {
   const supabase = useSupabase()
   const { locale, dir } = useLocale()
@@ -313,7 +320,13 @@ export function StorekeeperDashboard({
   }
 
   return (
+    <UiBlockVisibilityProvider
+      visibleCodes={visibleBlockCodes}
+      showAdminBlockCodes={context.isSystemAdmin}
+    >
     <div className={cn('space-y-8', isRtl && 'text-right')} dir={dir}>
+      <AdminUiBlockCatalogPanel dashboard="storekeeper" />
+
       <PageHeader
         title={t.title}
         description={t.description}
@@ -345,6 +358,7 @@ export function StorekeeperDashboard({
       ) : null}
 
       {kpis ? (
+        <UiBlockGuard code="SK-KPI-01">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard label={t.totalItems} value={kpis.totalItems} icon={Package} />
           <StatCard
@@ -356,9 +370,11 @@ export function StorekeeperDashboard({
           <StatCard label={t.incomingToday} value={kpis.incomingToday} icon={TrendingUp} trendType="up" />
           <StatCard label={t.outgoingToday} value={kpis.outgoingToday} icon={TrendingDown} trendType="down" />
         </div>
+        </UiBlockGuard>
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-2">
+        <UiBlockGuard code="SK-TBL-01">
         <SectionCard title={t.stockTable} description={t.emptyStock}>
           {items.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">{t.emptyStock}</p>
@@ -394,7 +410,9 @@ export function StorekeeperDashboard({
             </div>
           )}
         </SectionCard>
+        </UiBlockGuard>
 
+        <UiBlockGuard code="SK-TBL-02">
         <SectionCard title={t.transactionsTable} description={t.emptyTransactions}>
           {transactions.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">{t.emptyTransactions}</p>
@@ -429,8 +447,10 @@ export function StorekeeperDashboard({
             </div>
           )}
         </SectionCard>
+        </UiBlockGuard>
       </div>
 
+      <UiBlockGuard code="SK-ACT-01">
       <Card className="border-primary/20 shadow-card">
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -658,6 +678,8 @@ export function StorekeeperDashboard({
           ) : null}
         </CardContent>
       </Card>
+      </UiBlockGuard>
     </div>
+    </UiBlockVisibilityProvider>
   )
 }
