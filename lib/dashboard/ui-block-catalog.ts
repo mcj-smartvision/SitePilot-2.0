@@ -2,7 +2,7 @@
  * UI Block Catalog — single registry for admin visibility control.
  *
  * Naming: {DASH}-{KIND}-{NN}
- *   DASH: GEN | PM | SS | SK | PR | QC | HSE | SEC | ADM
+ *   DASH: GEN | PM | SS | SK | PR | QC | HSE | SEC | ACC | ADM
  *   KIND: WGT (widget) | KPI | CHT (chart) | TBL (table) | PNL (panel) | ACT (action) | REQ (request type)
  *
  * Phase 1: catalog + types (this file)
@@ -100,6 +100,21 @@ export const UI_BLOCK_CATALOG: UiBlockDefinition[] = [
   // ─── SEC: Security ───
   { code: 'SEC-PNL-01', key: 'sec.panel.placeholder', kind: 'panel', dashboard: 'security', layer: 'general', titleFa: 'داشبورد امنیت', titleEn: 'Security Dashboard', descriptionFa: 'placeholder', sortOrder: 710, defaultVisible: true },
 
+  // ─── ACC: Project Accountant (financial layer) ───
+  { code: 'ACC-KPI-01', key: 'acc.kpi.total_ac', kind: 'kpi', dashboard: 'accountant', layer: 'executive', titleFa: 'جمع هزینه واقعی (AC)', titleEn: 'Total AC', descriptionFa: 'مجموع actual cost از financial_costs', sortOrder: 810, defaultVisible: true },
+  { code: 'ACC-KPI-02', key: 'acc.kpi.total_invoiced', kind: 'kpi', dashboard: 'accountant', layer: 'executive', titleFa: 'جمع صورت‌وضعیت صادره', titleEn: 'Total Invoiced', descriptionFa: 'مجموع amount صورت‌وضعیت‌ها', sortOrder: 811, defaultVisible: true },
+  { code: 'ACC-KPI-03', key: 'acc.kpi.total_approved', kind: 'kpi', dashboard: 'accountant', layer: 'executive', titleFa: 'جمع تأییدشده کارفرما', titleEn: 'Total Approved', descriptionFa: 'مجموع approved_amount', sortOrder: 812, defaultVisible: true },
+  { code: 'ACC-KPI-04', key: 'acc.kpi.total_paid', kind: 'kpi', dashboard: 'accountant', layer: 'executive', titleFa: 'جمع پرداخت‌شده', titleEn: 'Total Paid', descriptionFa: 'مجموع paid_amount / cash-in', sortOrder: 813, defaultVisible: true },
+  { code: 'ACC-KPI-05', key: 'acc.kpi.outstanding', kind: 'kpi', dashboard: 'accountant', layer: 'executive', titleFa: 'مطالبات معوق', titleEn: 'Outstanding Receivables', descriptionFa: 'total_approved − total_paid', sortOrder: 814, defaultVisible: true },
+  { code: 'ACC-KPI-06', key: 'acc.kpi.cash_gap', kind: 'kpi', dashboard: 'accountant', layer: 'executive', titleFa: 'شکاف نقدینگی', titleEn: 'Cash Gap', descriptionFa: 'AC منهای cash-in', sortOrder: 815, defaultVisible: true },
+  { code: 'ACC-TBL-01', key: 'acc.table.costs', kind: 'table', dashboard: 'accountant', layer: 'operational', titleFa: 'جدول هزینه‌ها', titleEn: 'Cost Records', descriptionFa: 'financial_costs با فیلتر', sortOrder: 820, defaultVisible: true },
+  { code: 'ACC-TBL-02', key: 'acc.table.invoices', kind: 'table', dashboard: 'accountant', layer: 'operational', titleFa: 'جدول صورت‌وضعیت‌ها', titleEn: 'Invoices Table', descriptionFa: 'invoice_no، دوره، amount، status', sortOrder: 821, defaultVisible: true },
+  { code: 'ACC-CHT-01', key: 'acc.chart.invoice_trend', kind: 'chart', dashboard: 'accountant', layer: 'analytical', titleFa: 'روند صورت‌وضعیت ماهانه', titleEn: 'Invoice Trend', descriptionFa: 'amount / approved / paid به تفکیک ماه', sortOrder: 830, defaultVisible: true },
+  { code: 'ACC-CHT-02', key: 'acc.chart.fin_vs_phys', kind: 'chart', dashboard: 'accountant', layer: 'analytical', titleFa: 'پیشرفت مالی در برابر فیزیکی', titleEn: 'Financial vs Physical', descriptionFa: 'approved_amount در مقابل project_progress_cost', sortOrder: 831, defaultVisible: true },
+  { code: 'ACC-PNL-01', key: 'acc.panel.alerts', kind: 'panel', dashboard: 'accountant', layer: 'operational', titleFa: 'هشدارهای مالی', titleEn: 'Financial Alerts', descriptionFa: 'Approved بدون پرداخت، UnderReview طولانی', sortOrder: 840, defaultVisible: true },
+  { code: 'ACC-PNL-02', key: 'acc.panel.engineering_link', kind: 'panel', dashboard: 'accountant', layer: 'analytical', titleFa: 'پیشرفت مهندسی', titleEn: 'Engineering Progress', descriptionFa: 'لینک سبک به project_progress_cost', sortOrder: 841, defaultVisible: true },
+  { code: 'ACC-ACT-01', key: 'acc.action.add_cost', kind: 'action', dashboard: 'accountant', layer: 'operational', titleFa: 'ثبت هزینه', titleEn: 'Add Cost', descriptionFa: 'فرم افزودن رکورد financial_costs', sortOrder: 850, defaultVisible: true },
+
   // ─── REQ: Cross-cutting request / approval types ───
   { code: 'REQ-001', key: 'req.purchase_request', kind: 'request', dashboard: 'cross', layer: 'operational', titleFa: 'درخواست خرید', titleEn: 'Purchase Request', descriptionFa: 'SS → PM → PR', sortOrder: 801, defaultVisible: true },
   { code: 'REQ-002', key: 'req.subcontractor_instruction', kind: 'request', dashboard: 'cross', layer: 'operational', titleFa: 'دستور پیمانکار', titleEn: 'Subcontractor Instruction', descriptionFa: 'SS → PM', sortOrder: 802, defaultVisible: true },
@@ -136,6 +151,16 @@ export const PM_KPI_BLOCK_CODE: Record<string, string> = {
   wsi: 'PM-KPI-01',
   mrs: 'PM-KPI-02',
   csi: 'PM-KPI-03',
+}
+
+/** Accountant dashboard KPI keys → catalog block codes */
+export const ACC_KPI_BLOCK_CODE: Record<string, string> = {
+  total_ac: 'ACC-KPI-01',
+  total_invoiced: 'ACC-KPI-02',
+  total_approved: 'ACC-KPI-03',
+  total_paid: 'ACC-KPI-04',
+  outstanding: 'ACC-KPI-05',
+  cash_gap: 'ACC-KPI-06',
 }
 
 /** Legacy /dashboard widget key → GEN block code (admin UI Blocks tab) */

@@ -10,6 +10,7 @@ export const ROLE_DASHBOARD_ACCESS: Record<string, SiteRoleKey[]> = {
   qc: ['qa_qc_inspector'],
   hse: ['hse_officer'],
   security: ['security'],
+  accountant: ['project_accountant'],
 }
 
 export function hasRoleDashboardAccess(

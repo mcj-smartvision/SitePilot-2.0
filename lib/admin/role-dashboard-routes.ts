@@ -7,9 +7,13 @@ export const ROLE_DASHBOARD_ROUTES: Record<string, string> = {
   qa_qc_inspector: '/dashboard/qc',
   hse_officer: '/dashboard/hse',
   security: '/dashboard/security',
+  project_accountant: '/dashboard/accountant',
 }
 
 export function getRoleDashboardRoute(roleKey: string): string | null {
+  if (roleKey === 'finance_admin') {
+    return ROLE_DASHBOARD_ROUTES.project_accountant ?? null
+  }
   return ROLE_DASHBOARD_ROUTES[roleKey] ?? null
 }
 

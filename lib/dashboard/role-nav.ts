@@ -16,6 +16,7 @@ const ROLE_DASHBOARD_PATHS: Record<SiteRoleKey, string> = {
   hse_officer: '/dashboard/hse',
   security: '/dashboard/security',
   client: '/dashboard',
+  project_accountant: '/dashboard/accountant',
 }
 
 /** Navigation links visible in header based on assigned position keys. */

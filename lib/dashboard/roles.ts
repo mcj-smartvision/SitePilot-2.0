@@ -8,6 +8,7 @@ export const SITE_ROLES = {
   HSE: 'hse_officer',
   SECURITY: 'security',
   CLIENT: 'client',
+  PROJECT_ACCOUNTANT: 'project_accountant',
 } as const
 
 export type SiteRoleKey = (typeof SITE_ROLES)[keyof typeof SITE_ROLES]
@@ -21,6 +22,7 @@ export const SITE_ROLE_LABELS: Record<SiteRoleKey, string> = {
   hse_officer: 'HSE',
   security: 'Security',
   client: 'Client',
+  project_accountant: 'Project Accountant',
 }
 
 /** Higher index = lower priority when resolving a primary role. */
@@ -30,6 +32,7 @@ export const ROLE_PRIORITY: SiteRoleKey[] = [
   SITE_ROLES.QC,
   SITE_ROLES.HSE,
   SITE_ROLES.PROCUREMENT,
+  SITE_ROLES.PROJECT_ACCOUNTANT,
   SITE_ROLES.STOREKEEPER,
   SITE_ROLES.SECURITY,
   SITE_ROLES.CLIENT,
@@ -62,6 +65,7 @@ export const ROLE_WIDGET_KEYS: Record<SiteRoleKey, string[]> = {
   hse_officer: ['safety.overview', 'overview.stats'],
   security: ['security.entry_exit', 'security.alerts', 'overview.stats'],
   client: ['progress.overview', 'financial.overview', 'reports.recent'],
+  project_accountant: ['financial.overview', 'overview.stats', 'reports.recent'],
 }
 
 export function resolvePrimaryRole(positionKeys: string[]): SiteRoleKey | null {

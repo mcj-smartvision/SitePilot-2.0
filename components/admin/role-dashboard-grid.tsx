@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ROLE_DASHBOARD_PREVIEWS } from '@/lib/admin/construction-roles'
-import { CONSTRUCTION_ROLES } from '@/lib/admin/construction-roles'
-import { getRoleDashboardRoute, ROLE_DASHBOARD_ROUTES } from '@/lib/admin/role-dashboard-routes'
+import { CONSTRUCTION_ROLES, ROLE_DASHBOARD_PREVIEWS } from '@/lib/admin/construction-roles'
+import {
+  getRoleDashboardRoute,
+  ROLE_DASHBOARD_ROUTES,
+} from '@/lib/admin/role-dashboard-routes'
 import { cn } from '@/lib/utils'
 import { ChevronRight, TrendingDown, TrendingUp, Minus, AlertTriangle, ExternalLink } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -23,66 +25,85 @@ const trendColors = {
   warning: 'text-amber-600',
 }
 
+/** Stable display order for live role dashboards */
+const LIVE_DASHBOARD_ORDER = [
+  'project_manager',
+  'site_supervisor',
+  'project_accountant',
+  'storekeeper',
+  'procurement_officer',
+  'qa_qc_inspector',
+  'hse_officer',
+  'security',
+] as const
+
 export function RoleDashboardGrid() {
   const [expanded, setExpanded] = useState<string | null>('project_manager')
-  const allRoles = CONSTRUCTION_ROLES
+
+  const liveRoles = useMemo(() => {
+    return LIVE_DASHBOARD_ORDER.map((key) => {
+      const role = CONSTRUCTION_ROLES.find((r) => r.key === key)
+      const route = ROLE_DASHBOARD_ROUTES[key]
+      const preview = ROLE_DASHBOARD_PREVIEWS.find((p) => p.key === key)
+      return {
+        key,
+        title: preview?.title ?? role?.title ?? key,
+        route,
+        preview,
+      }
+    }).filter((r) => r.route)
+  }, [])
+
+  const comingSoonRoles = useMemo(() => {
+    const liveKeys = new Set(Object.keys(ROLE_DASHBOARD_ROUTES))
+    return CONSTRUCTION_ROLES.filter((role) => {
+      if (liveKeys.has(role.key)) return false
+      if (role.key === 'finance_admin') return false
+      return !getRoleDashboardRoute(role.key)
+    })
+  }, [])
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {allRoles.slice(0, 12).map((role) => {
-          const route = getRoleDashboardRoute(role.key)
-          const isSelected = expanded === role.key
-
-          if (route) {
-            return (
-              <Link
-                key={role.key}
-                href={route}
-                onClick={() => setExpanded(role.key)}
-                className={cn(
-                  'rounded-lg border px-3 py-1.5 text-xs font-medium transition-all inline-flex items-center gap-1',
-                  isSelected
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                )}
-              >
-                {role.title}
-                <ExternalLink className="h-3 w-3 opacity-60" />
-              </Link>
-            )
-          }
-
-          return (
-            <button
+    <div className="space-y-6">
+      {/* Quick open — live dashboards only */}
+      <div className="rounded-xl border bg-primary/5 p-4 space-y-3">
+        <p className="text-sm font-semibold">Live dashboards — open as admin</p>
+        <div className="flex flex-wrap gap-2">
+          {liveRoles.map((role) => (
+            <Link
               key={role.key}
-              type="button"
-              onClick={() => setExpanded(expanded === role.key ? null : role.key)}
+              href={role.route!}
+              onClick={() => setExpanded(role.key)}
               className={cn(
-                'rounded-lg border px-3 py-1.5 text-xs font-medium transition-all',
-                isSelected
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                'rounded-lg border px-3 py-2 text-xs font-medium transition-all inline-flex items-center gap-1.5',
+                expanded === role.key
+                  ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-card hover:border-primary/50 hover:bg-primary/10'
               )}
             >
               {role.title}
-            </button>
-          )
-        })}
-        <span className="self-center text-xs text-muted-foreground">+{allRoles.length - 12} more roles</span>
+              <ExternalLink className="h-3 w-3 opacity-70" />
+            </Link>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {liveRoles.length} active role dashboards — including Project Accountant (costs).
+        </p>
       </div>
 
+      {/* Preview cards — live only */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {ROLE_DASHBOARD_PREVIEWS.map((preview) => {
-          const route = getRoleDashboardRoute(preview.key)
+        {liveRoles.map((role) => {
+          const preview = role.preview
+          if (!preview) return null
 
           return (
             <div
-              key={preview.key}
+              key={role.key}
               className={cn(
                 'rounded-xl border bg-card shadow-card border-l-4 overflow-hidden transition-all',
                 preview.color,
-                expanded && expanded !== preview.key && expanded !== null ? 'opacity-60' : ''
+                expanded && expanded !== role.key ? 'opacity-70' : ''
               )}
             >
               <div className="p-5">
@@ -91,13 +112,13 @@ export function RoleDashboardGrid() {
                     <h3 className="font-semibold text-base">{preview.title}</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">{preview.summary}</p>
                   </div>
-                  {route ? (
-                    <Link href={route} className="shrink-0 text-primary hover:text-primary/80" title="Open dashboard">
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  )}
+                  <Link
+                    href={role.route!}
+                    className="shrink-0 text-primary hover:text-primary/80"
+                    title="Open dashboard"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Link>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
@@ -131,51 +152,32 @@ export function RoleDashboardGrid() {
               </div>
 
               <div className="border-t bg-muted/20 px-5 py-2.5">
-                {route ? (
-                  <Link href={route} className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1">
-                    View full {preview.title} dashboard
-                    <ExternalLink className="h-3 w-3" />
-                  </Link>
-                ) : (
-                  <span className="text-xs font-medium text-muted-foreground cursor-default">
-                    {preview.title} dashboard — coming soon
-                  </span>
-                )}
+                <Link
+                  href={role.route!}
+                  className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  View full {preview.title} dashboard
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
               </div>
             </div>
           )
         })}
       </div>
 
-      <div className="rounded-xl border bg-muted/30 p-4">
-        <p className="text-sm font-medium mb-2">All site roles — open dashboard</p>
-        <div className="flex flex-wrap gap-2">
-          {allRoles.map((role) => {
-            const route = getRoleDashboardRoute(role.key)
-            if (route) {
-              return (
-                <Link key={role.key} href={route}>
-                  <Badge
-                    variant="default"
-                    className="text-xs font-normal cursor-pointer hover:bg-primary/90 transition-colors"
-                  >
-                    {role.title} →
-                  </Badge>
-                </Link>
-              )
-            }
-            return (
+      {/* Coming soon — compact, no fake links */}
+      {comingSoonRoles.length > 0 ? (
+        <div className="rounded-xl border border-dashed bg-muted/20 p-4">
+          <p className="text-sm font-medium mb-2">Other site roles (dashboard coming soon)</p>
+          <div className="flex flex-wrap gap-2">
+            {comingSoonRoles.map((role) => (
               <Badge key={role.key} variant="outline" className="text-xs font-normal text-muted-foreground">
                 {role.title}
               </Badge>
-            )
-          })}
+            ))}
+          </div>
         </div>
-        <p className="text-xs text-muted-foreground mt-3">
-          Highlighted roles have a live dashboard. As system admin you can open any of them without switching
-          accounts ({Object.keys(ROLE_DASHBOARD_ROUTES).length} available).
-        </p>
-      </div>
+      ) : null}
     </div>
   )
 }
