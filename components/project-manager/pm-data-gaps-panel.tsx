@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { AlertCircle, CheckCircle2, CircleAlert, Database, ExternalLink } from 'lucide-react'
+import { PmMetricHelpButton } from '@/components/project-manager/pm-metric-help-button'
 import type { PmDataGap } from '@/lib/project-manager/data-gaps'
 import { cn } from '@/lib/utils'
 
@@ -19,9 +20,12 @@ export function PmDataGapsPanel({ gaps, isFa = true }: PmDataGapsPanelProps) {
       <div className="flex items-start gap-3 border-b px-5 py-4 bg-gradient-to-l from-slate-50 to-card">
         <Database className="h-5 w-5 text-slate-700 shrink-0 mt-0.5" />
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold">
-            {isFa ? 'وضعیت داده برای گزارش کامل' : 'Data readiness for full reporting'}
-          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-semibold">
+              {isFa ? 'وضعیت داده برای گزارش کامل' : 'Data readiness for full reporting'}
+            </h3>
+            <PmMetricHelpButton metricId="data-gaps" isFa={isFa} />
+          </div>
           <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
             {isFa
               ? 'اگر داده‌ای نیست، صریحاً نوشته شده و مسیر وارد کردن آن مشخص است تا شاخص‌ها دقیق شوند.'

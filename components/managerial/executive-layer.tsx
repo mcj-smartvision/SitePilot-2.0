@@ -14,6 +14,7 @@ import {
 import type { ExecutiveSummary } from '@/lib/managerial/types'
 import { PM_KPI_BLOCK_CODE } from '@/lib/dashboard/ui-block-catalog'
 import { UiBlockGuard } from '@/components/dashboard/ui-block-visibility'
+import { PmMetricHelpButton } from '@/components/project-manager/pm-metric-help-button'
 import { cn } from '@/lib/utils'
 
 export function ExecutiveLayer({ summary, projectName, phaseFa }: {
@@ -29,9 +30,12 @@ export function ExecutiveLayer({ summary, projectName, phaseFa }: {
         <div className="rounded-2xl border bg-gradient-to-br from-slate-50 to-orange-50/50 p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                لایه ۱ — خلاصه مدیریتی
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  لایه ۱ — خلاصه مدیریتی
+                </p>
+                <PmMetricHelpButton metricId="executive" isFa />
+              </div>
               <h2 className="text-2xl font-bold">{projectName}</h2>
               <p className="text-sm text-muted-foreground">فاز: {phaseFa}</p>
               <Badge variant="outline" className={cn('font-semibold text-sm px-3 py-1', statusClass)}>

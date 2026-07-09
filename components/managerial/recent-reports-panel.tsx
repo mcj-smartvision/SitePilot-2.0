@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { FileText, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FormattedDate } from '@/components/schedule/formatted-date'
+import { PmMetricHelpButton } from '@/components/project-manager/pm-metric-help-button'
 import type { SiteDailyReport } from '@/types/schedule'
 
 export function RecentReportsPanel({ reports }: { reports: SiteDailyReport[] }) {
@@ -11,10 +12,11 @@ export function RecentReportsPanel({ reports }: { reports: SiteDailyReport[] }) 
 
   return (
     <div className="rounded-2xl border bg-card shadow-sm overflow-hidden" dir="rtl">
-      <div className="flex items-center justify-between border-b px-5 py-4">
-        <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-primary" />
+      <div className="flex items-center justify-between border-b px-5 py-4 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <FileText className="h-5 w-5 text-primary shrink-0" />
           <h3 className="font-semibold">گزارش‌های اخیر / آرشیو</h3>
+          <PmMetricHelpButton metricId="recent-reports" isFa />
         </div>
         <Button asChild variant="outline" size="sm">
           <Link href="/reports">مشاهده همه</Link>

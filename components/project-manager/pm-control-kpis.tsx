@@ -11,6 +11,7 @@ import {
   Target,
   Timer,
 } from 'lucide-react'
+import { PmMetricHelpButton } from '@/components/project-manager/pm-metric-help-button'
 import type { PlanComplianceSummary } from '@/lib/project-manager/plan-compliance'
 import type { ProjectHealthStatus } from '@/lib/project-manager/types'
 import type { ProjectScheduleSummary } from '@/types/schedule'
@@ -180,22 +181,25 @@ export function PmControlKpis({ summary, health, compliance, isFa = true }: PmCo
               : 'From live schedule, actual progress, and until-today compliance'}
           </p>
         </div>
-        <div
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold',
-            health.riskLevel === 'high' && 'bg-red-50 text-red-800 border-red-200',
-            health.riskLevel === 'medium' && 'bg-amber-50 text-amber-900 border-amber-200',
-            health.riskLevel === 'low' && 'bg-emerald-50 text-emerald-800 border-emerald-200'
-          )}
-        >
-          {health.riskLevel === 'high' ? (
-            <ShieldAlert className="h-3.5 w-3.5" />
-          ) : health.riskLevel === 'medium' ? (
-            <AlertTriangle className="h-3.5 w-3.5" />
-          ) : (
-            <CheckCircle2 className="h-3.5 w-3.5" />
-          )}
-          {riskLabel}
+        <div className="flex flex-wrap items-center gap-2">
+          <PmMetricHelpButton metricId="control-kpis" isFa={isFa} />
+          <div
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold',
+              health.riskLevel === 'high' && 'bg-red-50 text-red-800 border-red-200',
+              health.riskLevel === 'medium' && 'bg-amber-50 text-amber-900 border-amber-200',
+              health.riskLevel === 'low' && 'bg-emerald-50 text-emerald-800 border-emerald-200'
+            )}
+          >
+            {health.riskLevel === 'high' ? (
+              <ShieldAlert className="h-3.5 w-3.5" />
+            ) : health.riskLevel === 'medium' ? (
+              <AlertTriangle className="h-3.5 w-3.5" />
+            ) : (
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            )}
+            {riskLabel}
+          </div>
         </div>
       </div>
 

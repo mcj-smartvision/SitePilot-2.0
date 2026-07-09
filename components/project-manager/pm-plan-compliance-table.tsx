@@ -4,6 +4,7 @@ import { Check, CircleDashed, Clock3, ListChecks, X } from 'lucide-react'
 import { FormattedDate } from '@/components/schedule/formatted-date'
 import { Badge } from '@/components/ui/badge'
 import { CriticalBadge } from '@/components/schedule/task-status-badge'
+import { PmMetricHelpButton } from '@/components/project-manager/pm-metric-help-button'
 import type { PlanComplianceRow, PlanComplianceSummary } from '@/lib/project-manager/plan-compliance'
 import { cn } from '@/lib/utils'
 
@@ -116,6 +117,7 @@ export function PmPlanComplianceTable({
             <h3 className="font-semibold flex items-center gap-2 text-base">
               <ListChecks className="h-5 w-5 text-orange-600" />
               {title}
+              <PmMetricHelpButton metricId="plan-compliance" isFa={isFa} />
             </h3>
             <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
             <p className="text-xs text-muted-foreground mt-1">

@@ -49,8 +49,10 @@ import { ActionNowBox } from '@/components/managerial/action-now-box'
 import { RecentReportsPanel } from '@/components/managerial/recent-reports-panel'
 import { PmControlKpis } from '@/components/project-manager/pm-control-kpis'
 import { PmDataGapsPanel } from '@/components/project-manager/pm-data-gaps-panel'
+import { PmMetricHelpButton } from '@/components/project-manager/pm-metric-help-button'
 import { PmPlanComplianceTable } from '@/components/project-manager/pm-plan-compliance-table'
 import { UiBlockGuard } from '@/components/dashboard/ui-block-visibility'
+import type { PmMetricGuideId } from '@/lib/project-manager/pm-metric-guides'
 import { PM_KPI_BLOCK_CODE } from '@/lib/dashboard/ui-block-catalog'
 import type { PmDataGap } from '@/lib/project-manager/data-gaps'
 import type { PlanComplianceSummary } from '@/lib/project-manager/plan-compliance'
@@ -92,7 +94,13 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
   )
 }
 
-function KpiAnalyticsCard({ kpi }: { kpi: AnalyticsKpi }) {
+const KPI_HELP_ID: Record<AnalyticsKpi['key'], PmMetricGuideId> = {
+  wsi: 'wsi',
+  mrs: 'mrs',
+  csi: 'csi',
+}
+
+function KpiAnalyticsCard({ kpi, isFa = true }: { kpi: AnalyticsKpi; isFa?: boolean }) {
   const color = KPI_STATE_COLORS[kpi.state]
   return (
     <div
@@ -109,7 +117,10 @@ function KpiAnalyticsCard({ kpi }: { kpi: AnalyticsKpi }) {
       />
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{kpi.label}</p>
+          <div className="flex items-center gap-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{kpi.label}</p>
+            <PmMetricHelpButton metricId={KPI_HELP_ID[kpi.key]} isFa={isFa} className="h-6 px-1.5" />
+          </div>
           <div className="flex items-baseline gap-1 mt-1">
             <span className="text-4xl font-bold tracking-tight" style={{ color }}>
               {kpi.value}
@@ -137,7 +148,7 @@ function KpiAnalyticsCard({ kpi }: { kpi: AnalyticsKpi }) {
   )
 }
 
-function RiskAlertsPanel({ data }: { data: PmAnalyticsData }) {
+function RiskAlertsPanel({ data, isFa = true }: { data: PmAnalyticsData; isFa?: boolean }) {
   const severityStyle = {
     critical: 'border-red-200 bg-red-50/80 dark:bg-red-950/30',
     warning: 'border-amber-200 bg-amber-50/80 dark:bg-amber-950/30',
@@ -147,9 +158,12 @@ function RiskAlertsPanel({ data }: { data: PmAnalyticsData }) {
 
   return (
     <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2 border-b px-5 py-4">
-        <ShieldAlert className="h-5 w-5 text-red-600" />
-        <h3 className="font-semibold">هشدارهای ریسک</h3>
+      <div className="flex items-center justify-between gap-2 border-b px-5 py-4">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="h-5 w-5 text-red-600" />
+          <h3 className="font-semibold">هشدارهای ریسک</h3>
+        </div>
+        <PmMetricHelpButton metricId="risk-alerts" isFa={isFa} />
       </div>
       <div className="p-4 space-y-3 max-h-[420px] overflow-y-auto">
         {data.riskAlerts.map((alert) => (
@@ -172,12 +186,15 @@ function RiskAlertsPanel({ data }: { data: PmAnalyticsData }) {
   )
 }
 
-function InsightsPanel({ data }: { data: PmAnalyticsData }) {
+function InsightsPanel({ data, isFa = true }: { data: PmAnalyticsData; isFa?: boolean }) {
   return (
     <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2 border-b px-5 py-4">
-        <Brain className="h-5 w-5 text-primary" />
-        <h3 className="font-semibold">بینش‌های عملیاتی</h3>
+      <div className="flex items-center justify-between gap-2 border-b px-5 py-4">
+        <div className="flex items-center gap-2">
+          <Brain className="h-5 w-5 text-primary" />
+          <h3 className="font-semibold">بینش‌های عملیاتی</h3>
+        </div>
+        <PmMetricHelpButton metricId="insights" isFa={isFa} />
       </div>
       <div className="p-4 space-y-3">
         {data.insights.map((insight) => (
@@ -294,7 +311,7 @@ export function PmAnalyticsControlRoom({
       <div className="grid gap-4 md:grid-cols-3">
         {analytics.kpis.map((kpi) => (
           <UiBlockGuard key={kpi.key} code={PM_KPI_BLOCK_CODE[kpi.key] ?? 'PM-KPI-01'}>
-            <KpiAnalyticsCard kpi={kpi} />
+            <KpiAnalyticsCard kpi={kpi} isFa={isFa} />
           </UiBlockGuard>
         ))}
       </div>
@@ -303,14 +320,17 @@ export function PmAnalyticsControlRoom({
         <div className="xl:col-span-2 space-y-6">
           <UiBlockGuard code="PM-CHT-01">
             <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="mb-4">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                روند WSI و MRS
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                خطوط نقطه‌چین: حداقل WSI (۷۰) و MRS (۷۵) — زیر این خط = هشدار
-              </p>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  روند WSI و MRS
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  خطوط نقطه‌چین: حداقل WSI (۷۰) و MRS (۷۵) — زیر این خط = هشدار
+                </p>
+              </div>
+              <PmMetricHelpButton metricId="wsi-mrs-trend" isFa={isFa} />
             </div>
             <div className="h-[280px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -339,14 +359,17 @@ export function PmAnalyticsControlRoom({
 
           <UiBlockGuard code="PM-CHT-02">
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="mb-4">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Gauge className="h-5 w-5 text-primary" />
-                وضعیت فعالیت‌های موعد تا امروز
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                سهم انجام‌شده / مطابق / عقب / شروع‌نشده از فعالیت‌هایی که باید تا امروز شروع شده باشند
-              </p>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Gauge className="h-5 w-5 text-primary" />
+                  وضعیت فعالیت‌های موعد تا امروز
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  سهم انجام‌شده / مطابق / عقب / شروع‌نشده از فعالیت‌هایی که باید تا امروز شروع شده باشند
+                </p>
+              </div>
+              <PmMetricHelpButton metricId="due-activities" isFa={isFa} />
             </div>
             <div className="h-[260px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -374,7 +397,10 @@ export function PmAnalyticsControlRoom({
         <div className="space-y-6">
           <UiBlockGuard code="PM-CHT-03">
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <h3 className="font-semibold mb-1">آمادگی کلی پروژه</h3>
+            <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
+              <h3 className="font-semibold">آمادگی کلی پروژه</h3>
+              <PmMetricHelpButton metricId="readiness-donut" isFa={isFa} />
+            </div>
             <p className="text-xs text-muted-foreground mb-4">ترکیب نیرو، مصالح و زمان‌بندی</p>
             <div className="h-[200px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -415,10 +441,10 @@ export function PmAnalyticsControlRoom({
           </UiBlockGuard>
 
           <UiBlockGuard code="PM-PNL-04">
-            <RiskAlertsPanel data={analytics} />
+            <RiskAlertsPanel data={analytics} isFa={isFa} />
           </UiBlockGuard>
           <UiBlockGuard code="PM-PNL-05">
-            <InsightsPanel data={analytics} />
+            <InsightsPanel data={analytics} isFa={isFa} />
           </UiBlockGuard>
         </div>
       </div>
