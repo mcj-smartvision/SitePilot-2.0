@@ -1,5 +1,7 @@
 import type { AiStatus } from '@/lib/shared/ai-types'
 import type { AiActionType } from '@/lib/supervisor/types'
+import type { PmDataGap } from '@/lib/project-manager/data-gaps'
+import type { PlanComplianceSummary } from '@/lib/project-manager/plan-compliance'
 import type { ProjectScheduleSummary, SiteDailyReport } from '@/types/schedule'
 
 export type ApprovalItemType =
@@ -62,6 +64,13 @@ export interface ProjectManagerDashboardData {
   activity: ActivityFeedItem[]
   summary: ProjectScheduleSummary
   reports: SiteDailyReport[]
+  compliance: PlanComplianceSummary
+  dataGaps: PmDataGap[]
+  scheduleMeta: {
+    schedule_baseline_start: string | null
+    schedule_actual_start: string | null
+    schedule_start_aligned: boolean | null
+  }
 }
 
 const TYPE_LABELS: Record<AiActionType, string> = {
@@ -86,17 +95,31 @@ export function aiActionToApprovalItem(row: {
   const priority =
     row.type === 'hse_alert' ? 'critical' : row.type === 'purchase_request' ? 'high' : 'medium'
 
+  const activityName = String(row.payload.activity_name ?? '').trim()
+  const materialName = String(row.payload.material_name ?? '').trim()
+  const instructionSnippet = String(row.payload.instruction ?? '').trim()
+
+  let description = ''
+  if (row.type === 'subcontractor_instruction') {
+    description = activityName || instructionSnippet || row.text_generated.slice(0, 120)
+  } else if (row.type === 'purchase_request') {
+    description = materialName || row.text_generated.slice(0, 120)
+  } else {
+    description = instructionSnippet || row.text_generated.slice(0, 120)
+  }
+
   return {
     id: row.id,
     kind: 'ai_action',
     type: row.type as ApprovalItemType,
     sourceDepartment: 'Site Supervisor',
     title: TYPE_LABELS[row.type] ?? row.type,
-    description: String(row.payload.material_name ?? row.payload.instruction ?? row.text_generated.slice(0, 120)),
+    description,
     priority,
     status: 'pending_pm',
     aiGeneratedText: row.text_generated,
     createdAt: row.created_at,
+    raw: row.payload,
   }
 }
 

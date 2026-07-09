@@ -40,16 +40,30 @@ export function AiDraftViewer({
   }, [text])
 
   const isDraft = status === 'draft_by_ai'
-  const canAct = showActions && onApprove && onReject && (forceShowActions || isDraft)
+  const canAct = showActions && (forceShowActions || isDraft) && Boolean(onApprove || onReject)
+  const badgeText =
+    labels.statusBadge ??
+    (isDraft ? labels.draftByAi : status === 'confirmed_by_user' ? labels.confirmed : labels.reject)
+  const badgeVariant = labels.statusBadge
+    ? 'secondary'
+    : isDraft
+      ? 'secondary'
+      : status === 'confirmed_by_user'
+        ? 'default'
+        : 'outline'
 
   return (
     <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <Bot className="h-4 w-4 text-primary" />
-        <Badge variant={isDraft ? 'secondary' : status === 'confirmed_by_user' ? 'default' : 'outline'}>
-          {isDraft ? labels.draftByAi : status === 'confirmed_by_user' ? labels.confirmed : labels.reject}
-        </Badge>
+        <Badge variant={badgeVariant}>{badgeText}</Badge>
       </div>
+
+      {labels.whatIsThis ? (
+        <p className="text-xs text-muted-foreground leading-relaxed rounded-md border bg-background/70 px-3 py-2">
+          {labels.whatIsThis}
+        </p>
+      ) : null}
 
       {editing ? (
         <Textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} className="text-sm" />
@@ -57,12 +71,25 @@ export function AiDraftViewer({
         <pre className="whitespace-pre-wrap text-sm leading-relaxed font-sans">{draft}</pre>
       )}
 
+      {labels.destinationHint ? (
+        <p className="text-xs font-medium text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+          {labels.destinationHint}
+        </p>
+      ) : null}
+
       {canAct ? (
         <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" disabled={loading} onClick={() => void onApprove(draft)}>
-            <CheckCircle2 className="h-4 w-4" />
-            {loading ? labels.saving : labels.approveSend}
-          </Button>
+          {onApprove ? (
+            <Button type="button" size="sm" disabled={loading} onClick={() => void onApprove(draft)}>
+              <CheckCircle2 className="h-4 w-4" />
+              {loading ? labels.saving : labels.approveSend}
+            </Button>
+          ) : (
+            <Button type="button" size="sm" disabled>
+              <CheckCircle2 className="h-4 w-4" />
+              {labels.approveSend}
+            </Button>
+          )}
           <Button type="button" size="sm" variant="outline" disabled={loading} onClick={() => setEditing((v) => !v)}>
             <Pencil className="h-4 w-4" />
             {labels.editText}
@@ -72,10 +99,12 @@ export function AiDraftViewer({
               {labels.regenerate}
             </Button>
           ) : null}
-          <Button type="button" size="sm" variant="ghost" disabled={loading} onClick={() => void onReject()}>
-            <XCircle className="h-4 w-4" />
-            {labels.reject}
-          </Button>
+          {onReject ? (
+            <Button type="button" size="sm" variant="ghost" disabled={loading} onClick={() => void onReject()}>
+              <XCircle className="h-4 w-4" />
+              {labels.reject}
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>

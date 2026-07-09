@@ -15,6 +15,7 @@ interface ScheduleDateInputProps {
   onChangeIso: (iso: string) => void
   className?: string
   disabled?: boolean
+  required?: boolean
 }
 
 /** Date input that follows the global calendar mode (Gregorian or Shamsi). */
@@ -25,6 +26,7 @@ export function ScheduleDateInput({
   onChangeIso,
   className,
   disabled,
+  required,
 }: ScheduleDateInputProps) {
   const { locale } = useLocale()
   const fa = locale === 'fa'
@@ -70,6 +72,7 @@ export function ScheduleDateInput({
           type="date"
           value={valueIso}
           disabled={disabled}
+          required={required}
           onChange={(e) => {
             onChangeIso(e.target.value)
             setInvalid(false)
@@ -93,13 +96,19 @@ export function ScheduleDateInput({
         placeholder="1403/07/14"
         value={textValue}
         disabled={disabled}
+        required={required}
         className={invalid ? 'border-destructive' : undefined}
+        dir="ltr"
         onChange={(e) => setTextValue(e.target.value)}
         onBlur={(e) => commitInput(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') commitInput(textValue)
         }}
       />
+      <p className="text-[10px] text-muted-foreground mt-1">
+        {calendarLabel}
+        {fa ? ' — مثال: ۱۴۰۳/۰۷/۱۴' : ' — e.g. 1403/07/14'}
+      </p>
       {invalid ? (
         <p className="text-xs text-destructive mt-1">
           {fa ? 'فرمت: 1403/07/14' : 'Format: 1403/07/14'}

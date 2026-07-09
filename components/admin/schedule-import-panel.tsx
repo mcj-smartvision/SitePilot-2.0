@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ActualStartPanel } from '@/components/admin/actual-start-panel'
+import { ScheduleCatchUpPanel } from '@/components/admin/schedule-catch-up-panel'
 import { ScheduleDateToolbar } from '@/components/schedule/schedule-date-toolbar'
 import { SchedulePreviewTable } from '@/components/schedule/schedule-preview-table'
 import { FormattedDate } from '@/components/schedule/formatted-date'
@@ -168,6 +169,18 @@ export function ScheduleImportPanel({
           taskCount={taskCount}
           onDraftChange={handleDraftChange}
           onRescheduled={handleRescheduled}
+        />
+      ) : null}
+
+      {hasSchedule && actualStart ? (
+        <ScheduleCatchUpPanel
+          projectId={projectId}
+          tasks={displayTasks}
+          actualStart={actualStart}
+          onTasksUpdated={(next) => {
+            localRescheduleRef.current = true
+            setTasks(sortTasks(next))
+          }}
         />
       ) : null}
 

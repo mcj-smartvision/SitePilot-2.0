@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   AlertTriangle,
+  Camera,
   Download,
   FileSpreadsheet,
   FileText,
@@ -11,10 +12,14 @@ import {
   Loader2,
   Plus,
   Search,
+  Sparkles,
   Upload,
+  X,
 } from 'lucide-react'
 import { useLocale } from '@/components/i18n/locale-provider'
 import { FormattedDate } from '@/components/schedule/formatted-date'
+import { ScheduleDateInput } from '@/components/schedule/schedule-date-input'
+import { useScheduleCalendar } from '@/hooks/useScheduleCalendar'
 import {
   PageHeader,
   LoadingBlock,
@@ -35,6 +40,7 @@ import {
 } from '@/components/ui/select'
 import { ModalOverlay } from '@/components/shared/modal-overlay'
 import { ExpenseStatusBadge } from '@/components/finance/expense-status-badge'
+import { SalesInvoiceView } from '@/components/finance/sales-invoice-view'
 import {
   MoneyInput,
   parseMoneyInput,
@@ -48,6 +54,7 @@ import {
   type AccountingDocument,
   type AccountingDocumentRevision,
   type AccountingDocumentStatus,
+  type CreateExpenseItemInput,
   type DuplicateMatch,
   type ExpenseCategory,
   type ExpenseImportRow,
@@ -89,6 +96,11 @@ import {
   uploadExpenseExport,
 } from '@/utils/finance/expenses'
 import type { FinancialCost } from '@/lib/finance/types'
+import { mapAiItemsToExpenseItems } from '@/lib/finance/expense-ai-types'
+import {
+  analyzeExpenseDocumentImage,
+  uploadExpenseAttachment,
+} from '@/utils/finance/expense-ai'
 
 interface ExpenseManagementProps {
   initialContext: DashboardUserContext
@@ -124,6 +136,7 @@ export function ExpenseManagement({
 }: ExpenseManagementProps) {
   const supabase = useSupabase()
   const { locale, dir } = useLocale()
+  const { calendar } = useScheduleCalendar()
   const t = getExpenseMessages(locale)
   const isRtl = dir === 'rtl'
   const isFa = locale === 'fa' || locale === 'ar'
@@ -174,6 +187,16 @@ export function ExpenseManagement({
   const [formDescription, setFormDescription] = useState('')
   const [formCostType, setFormCostType] = useState<FinancialCostType>('materials')
   const [formCategoryId, setFormCategoryId] = useState<string>('')
+  const [formItems, setFormItems] = useState<CreateExpenseItemInput[]>([])
+
+  // AI scan (photo → pre-fill → user confirms)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
+  const [scanFile, setScanFile] = useState<File | null>(null)
+  const [scanPreview, setScanPreview] = useState<string | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [aiPrefill, setAiPrefill] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
 
   // Import
   const [showImport, setShowImport] = useState(false)
@@ -184,6 +207,95 @@ export function ExpenseManagement({
   const [existingForDup, setExistingForDup] = useState<AccountingDocument[]>([])
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
+
+  const activeProjectName =
+    projectOptions.find((p) => p.id === projectId)?.name ?? null
+
+  /** Live invoice preview from current form values (for AI / manual review before save). */
+  const formInvoicePreview = useMemo((): AccountingDocument | null => {
+    const amount = parseMoneyInput(formAmount) ?? 0
+    const hasContent =
+      formItems.length > 0 ||
+      Boolean(formInvoiceNo.trim()) ||
+      Boolean(formSupplier.trim()) ||
+      Boolean(formDescription.trim()) ||
+      amount > 0
+    if (!hasContent) return null
+
+    const now = new Date().toISOString()
+    const items = formItems.map((item, idx) => {
+      const qty =
+        Number.isFinite(item.quantity) && (item.quantity ?? 0) > 0 ? Number(item.quantity) : 1
+      const lineAmount = Number(item.amount) || 0
+      const unitPrice =
+        item.unitPrice != null && Number.isFinite(item.unitPrice)
+          ? Number(item.unitPrice)
+          : qty > 0
+            ? lineAmount / qty
+            : lineAmount
+      return {
+        id: `draft-${idx}`,
+        document_id: editDoc?.id ?? 'draft',
+        project_id: projectId ?? '',
+        category_id: item.categoryId ?? (formCategoryId || null),
+        line_no: item.lineNo ?? idx + 1,
+        item_code: item.itemCode ?? null,
+        description: item.description ?? '',
+        quantity: qty,
+        unit: item.unit ?? null,
+        unit_price: unitPrice,
+        amount: lineAmount,
+        cost_type: item.costType ?? formCostType,
+        created_at: now,
+        updated_at: now,
+      }
+    })
+
+    return {
+      id: editDoc?.id ?? 'draft',
+      project_id: projectId ?? '',
+      category_id: formCategoryId || null,
+      document_no: formDocumentNo.trim() || null,
+      invoice_no: formInvoiceNo.trim() || null,
+      supplier_name: formSupplier.trim() || null,
+      document_date: formDate || todayDateInputValue(),
+      amount,
+      description: formDescription,
+      cost_type: formCostType,
+      status: editDoc?.status ?? 'draft',
+      correction_of_document_id: editDoc?.correction_of_document_id ?? null,
+      reversal_of_document_id: editDoc?.reversal_of_document_id ?? null,
+      finalized_at: null,
+      finalized_by: null,
+      cancelled_at: null,
+      cancelled_by: null,
+      cancel_reason: null,
+      reversed_at: null,
+      reversed_by: null,
+      reverse_reason: null,
+      is_duplicate: false,
+      duplicate_of_document_id: null,
+      duplicate_reason: null,
+      synced_cost_id: null,
+      created_by: null,
+      updated_by: null,
+      created_at: now,
+      updated_at: now,
+      expense_items: items,
+    }
+  }, [
+    formAmount,
+    formItems,
+    formInvoiceNo,
+    formSupplier,
+    formDescription,
+    formDocumentNo,
+    formDate,
+    formCategoryId,
+    formCostType,
+    projectId,
+    editDoc,
+  ])
 
   // Keep in sync when header project switcher calls router.refresh()
   useEffect(() => {
@@ -277,6 +389,16 @@ export function ExpenseManagement({
     }
   }
 
+  function clearScan() {
+    if (scanPreview) URL.revokeObjectURL(scanPreview)
+    setScanFile(null)
+    setScanPreview(null)
+    setAiPrefill(false)
+    setScanError(null)
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
+    if (uploadInputRef.current) uploadInputRef.current.value = ''
+  }
+
   function resetForm() {
     setFormDocumentNo('')
     setFormInvoiceNo('')
@@ -286,9 +408,11 @@ export function ExpenseManagement({
     setFormDescription('')
     setFormCostType('materials')
     setFormCategoryId('')
+    setFormItems([])
     setDuplicates([])
     setForceDuplicate(false)
     setEditDoc(null)
+    clearScan()
   }
 
   function openCreate() {
@@ -298,6 +422,7 @@ export function ExpenseManagement({
 
   function openEdit(doc: AccountingDocument) {
     if (!isDocumentEditable(doc.status)) return
+    clearScan()
     setEditDoc(doc)
     setFormDocumentNo(doc.document_no ?? '')
     setFormInvoiceNo(doc.invoice_no ?? '')
@@ -307,10 +432,98 @@ export function ExpenseManagement({
     setFormDescription(doc.description)
     setFormCostType(doc.cost_type)
     setFormCategoryId(doc.category_id ?? '')
+    setFormItems(
+      (doc.expense_items ?? []).map((item) => ({
+        categoryId: item.category_id,
+        lineNo: item.line_no,
+        itemCode: item.item_code ?? undefined,
+        description: item.description,
+        quantity: item.quantity,
+        unit: item.unit ?? undefined,
+        unitPrice: item.unit_price,
+        amount: item.amount,
+        costType: item.cost_type,
+      }))
+    )
     setDuplicates([])
     setForceDuplicate(false)
     setShowForm(true)
+    // Load line items if list row didn't include them
+    if (!doc.expense_items?.length) {
+      void fetchExpenseDocumentDetail(supabase, doc.id).then((detail) => {
+        if (!detail?.expense_items?.length) return
+        setFormItems(
+          detail.expense_items.map((item) => ({
+            categoryId: item.category_id,
+            lineNo: item.line_no,
+            itemCode: item.item_code ?? undefined,
+            description: item.description,
+            quantity: item.quantity,
+            unit: item.unit ?? undefined,
+            unitPrice: item.unit_price,
+            amount: item.amount,
+            costType: item.cost_type,
+          }))
+        )
+      })
+    }
   }
+
+  function handleScanFileSelected(file: File | null) {
+    if (!file) return
+    setScanError(null)
+    setScanFile(file)
+    if (scanPreview) URL.revokeObjectURL(scanPreview)
+    setScanPreview(URL.createObjectURL(file))
+    setAiPrefill(false)
+    setFormItems([])
+  }
+
+  async function handleAnalyzeScan() {
+    if (!scanFile) return
+    setAnalyzing(true)
+    setScanError(null)
+    try {
+      const extracted = await analyzeExpenseDocumentImage(supabase, scanFile)
+      if (extracted.documentNo) setFormDocumentNo(extracted.documentNo)
+      if (extracted.invoiceNo) setFormInvoiceNo(extracted.invoiceNo)
+      if (extracted.supplierName) setFormSupplier(extracted.supplierName)
+      if (extracted.documentDate) setFormDate(extracted.documentDate)
+      if (extracted.amount != null && extracted.amount > 0) {
+        setFormAmount(formatMoneyFromNumber(extracted.amount, locale))
+      }
+      if (extracted.description) setFormDescription(extracted.description)
+      if (extracted.costType) setFormCostType(extracted.costType)
+      if (extracted.items.length > 0) {
+        const costType = extracted.costType ?? formCostType
+        setFormItems(mapAiItemsToExpenseItems(extracted.items, costType))
+        if (!extracted.description) {
+          setFormDescription(
+            extracted.items
+              .slice(0, 5)
+              .map((i) => i.description)
+              .join('، ')
+          )
+        }
+        if (extracted.amount == null) {
+          const sum = extracted.items.reduce((acc, i) => acc + (i.amount ?? 0), 0)
+          if (sum > 0) setFormAmount(formatMoneyFromNumber(sum, locale))
+        }
+      }
+      setAiPrefill(true)
+      setSuccess(t.analyzeSuccess)
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : t.analyzeError)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (scanPreview) URL.revokeObjectURL(scanPreview)
+    }
+  }, [scanPreview])
 
   async function openDetail(doc: AccountingDocument) {
     try {
@@ -364,9 +577,22 @@ export function ExpenseManagement({
           description: formDescription,
           costType: formCostType,
           updatedBy: initialContext.userId,
+          items: formItems.length > 0 ? formItems : undefined,
         })
+        if (scanFile) {
+          try {
+            await uploadExpenseAttachment(supabase, {
+              projectId,
+              documentId: editDoc.id,
+              file: scanFile,
+              createdBy: initialContext.userId,
+            })
+          } catch {
+            // Attachment is best-effort; document already saved
+          }
+        }
       } else {
-        await createExpenseDocument(supabase, {
+        const created = await createExpenseDocument(supabase, {
           projectId,
           categoryId: formCategoryId || null,
           documentNo: formDocumentNo,
@@ -378,7 +604,20 @@ export function ExpenseManagement({
           costType: formCostType,
           createdBy: initialContext.userId,
           allowDuplicate: forceDuplicate,
+          items: formItems.length > 0 ? formItems : undefined,
         })
+        if (scanFile && created?.id) {
+          try {
+            await uploadExpenseAttachment(supabase, {
+              projectId,
+              documentId: created.id,
+              file: scanFile,
+              createdBy: initialContext.userId,
+            })
+          } catch {
+            // Attachment is best-effort; draft document already saved
+          }
+        }
       }
 
       setShowForm(false)
@@ -497,7 +736,7 @@ export function ExpenseManagement({
       },
       { page: 1, pageSize: 1000, sortBy, sortAsc }
     )
-    const csv = buildExpenseCsv(all.rows, isFa ? 'fa' : 'en')
+    const csv = buildExpenseCsv(all.rows, isFa ? 'fa' : 'en', calendar)
     const fileName = `expenses-${projectId.slice(0, 8)}.csv`
     downloadTextFile(fileName, csv, 'text/csv;charset=utf-8')
     try {
@@ -516,7 +755,11 @@ export function ExpenseManagement({
 
   async function handleExportPdf(doc: AccountingDocument) {
     const detail = (await fetchExpenseDocumentDetail(supabase, doc.id)) ?? doc
-    const html = buildExpenseDocumentHtml(detail, isFa ? 'fa' : 'en')
+    const projectName =
+      projectOptions.find((p) => p.id === (detail.project_id || projectId))?.name ?? null
+    const html = buildExpenseDocumentHtml(detail, isFa ? 'fa' : 'en', calendar, {
+      projectName,
+    })
     openPrintableHtml(html)
     if (projectId) {
       try {
@@ -748,7 +991,8 @@ export function ExpenseManagement({
             {legacyCosts.slice(0, 8).map((c) => (
               <li key={c.id} className="flex justify-between gap-3">
                 <span className="truncate">
-                  {c.date} · {FINANCIAL_COST_TYPE_LABELS[c.type]} · {c.description || '—'}
+                  <FormattedDate value={c.date} /> · {FINANCIAL_COST_TYPE_LABELS[c.type]} ·{' '}
+                  {c.description || '—'}
                 </span>
                 <span className="tabular-nums shrink-0">{money(Number(c.amount))}</span>
               </li>
@@ -845,23 +1089,21 @@ export function ExpenseManagement({
             />
           </div>
           <div className="space-y-1.5">
-            <Label>{t.dateFrom}</Label>
-            <Input
-              type="date"
-              value={filterDateFrom}
-              onChange={(e) => {
-                setFilterDateFrom(e.target.value)
+            <ScheduleDateInput
+              label={t.dateFrom}
+              valueIso={filterDateFrom}
+              onChangeIso={(iso) => {
+                setFilterDateFrom(iso)
                 setPage(1)
               }}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>{t.dateTo}</Label>
-            <Input
-              type="date"
-              value={filterDateTo}
-              onChange={(e) => {
-                setFilterDateTo(e.target.value)
+            <ScheduleDateInput
+              label={t.dateTo}
+              valueIso={filterDateTo}
+              onChangeIso={(iso) => {
+                setFilterDateTo(iso)
                 setPage(1)
               }}
             />
@@ -1117,9 +1359,128 @@ export function ExpenseManagement({
           resetForm()
         }}
         title={editDoc ? t.formEditTitle : t.formTitle}
-        className="sm:max-w-xl"
+        className="sm:max-w-4xl"
       >
         <form onSubmit={(e) => void handleSave(e)} className="space-y-4">
+          {/* AI scan: photo → pre-fill → user confirms */}
+          {!editDoc ? (
+            <div className="rounded-xl border bg-muted/20 p-3 space-y-3">
+              <div>
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-600" />
+                  {t.scanTitle}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">{t.scanHint}</p>
+              </div>
+
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  handleScanFileSelected(e.target.files?.[0] ?? null)
+                }}
+              />
+              <input
+                ref={uploadInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  handleScanFileSelected(e.target.files?.[0] ?? null)
+                }}
+              />
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => cameraInputRef.current?.click()}
+                >
+                  <Camera className="h-4 w-4 me-1" />
+                  {t.takePhoto}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => uploadInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4 me-1" />
+                  {t.uploadPhoto}
+                </Button>
+                {scanFile ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={analyzing}
+                      onClick={() => void handleAnalyzeScan()}
+                    >
+                      {analyzing ? (
+                        <Loader2 className="h-4 w-4 animate-spin me-1" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 me-1" />
+                      )}
+                      {analyzing ? t.analyzing : t.analyzeWithAi}
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={clearScan}>
+                      <X className="h-4 w-4 me-1" />
+                      {t.clearScan}
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+
+              {scanPreview ? (
+                <div className="relative overflow-hidden rounded-lg border bg-background">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={scanPreview}
+                    alt="scan preview"
+                    className="max-h-48 w-full object-contain"
+                  />
+                </div>
+              ) : null}
+
+              {scanError ? (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive space-y-1">
+                  <p>{scanError}</p>
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => void handleAnalyzeScan()}
+                  >
+                    {isFa ? 'تلاش دوباره' : 'Try again'}
+                  </button>
+                </div>
+              ) : null}
+
+              {aiPrefill ? (
+                <p className="text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+                  {t.aiDraftBadge}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {formInvoicePreview ? (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">{t.invoicePreview}</p>
+              <div className="max-h-[28rem] overflow-y-auto rounded-md">
+                <SalesInvoiceView
+                  doc={formInvoicePreview}
+                  projectName={activeProjectName}
+                  locale={isFa ? 'fa' : 'en'}
+                  compact
+                />
+              </div>
+            </div>
+          ) : null}
+
           {duplicates.length > 0 ? (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 space-y-2">
               <div className="flex items-start gap-2 font-medium">
@@ -1158,11 +1519,10 @@ export function ExpenseManagement({
               <Input value={formSupplier} onChange={(e) => setFormSupplier(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>{t.date}</Label>
-              <Input
-                type="date"
-                value={formDate}
-                onChange={(e) => setFormDate(e.target.value)}
+              <ScheduleDateInput
+                label={t.date}
+                valueIso={formDate}
+                onChangeIso={setFormDate}
                 required
               />
             </div>
@@ -1239,15 +1599,15 @@ export function ExpenseManagement({
         </form>
       </ModalOverlay>
 
-      {/* Detail drawer/modal */}
+      {/* Detail drawer/modal — classic sales invoice layout */}
       <ModalOverlay
         open={Boolean(detailDoc)}
         onClose={() => {
           setDetailDoc(null)
           setRevisions([])
         }}
-        title={t.detailTitle}
-        className="sm:max-w-2xl"
+        title={isFa ? 'فاکتور فروش' : t.detailTitle}
+        className="sm:max-w-4xl"
       >
         {detailDoc ? (
           <div className="space-y-4 text-sm">
@@ -1259,65 +1619,32 @@ export function ExpenseManagement({
                   {t.locked}
                 </span>
               ) : null}
-            </div>
-            <dl className="grid gap-2 sm:grid-cols-2">
-              <div>
-                <dt className="text-muted-foreground">{t.documentNo}</dt>
-                <dd className="font-mono">{detailDoc.document_no ?? '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">{t.invoiceNo}</dt>
-                <dd>{detailDoc.invoice_no ?? '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">{t.supplier}</dt>
-                <dd>{detailDoc.supplier_name ?? '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">{t.amount}</dt>
-                <dd className="font-medium tabular-nums">{money(detailDoc.amount)}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">{t.date}</dt>
-                <dd>
-                  <FormattedDate value={detailDoc.document_date} />
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">{t.description}</dt>
-                <dd>{detailDoc.description || '—'}</dd>
-              </div>
+              {detailDoc.document_no ? (
+                <span className="text-xs text-muted-foreground font-mono">
+                  {t.documentNo}: {detailDoc.document_no}
+                </span>
+              ) : null}
               {detailDoc.correction_of_document_id ? (
-                <div className="sm:col-span-2">
-                  <dt className="text-muted-foreground">{t.correctionOf}</dt>
-                  <dd className="font-mono text-xs">{detailDoc.correction_of_document_id}</dd>
-                </div>
+                <span className="text-xs text-muted-foreground">
+                  {t.correctionOf}: {detailDoc.correction_of_document_id.slice(0, 8)}…
+                </span>
               ) : null}
               {detailDoc.reversal_of_document_id ? (
-                <div className="sm:col-span-2">
-                  <dt className="text-muted-foreground">{t.reversalOf}</dt>
-                  <dd className="font-mono text-xs">{detailDoc.reversal_of_document_id}</dd>
-                </div>
+                <span className="text-xs text-muted-foreground">
+                  {t.reversalOf}: {detailDoc.reversal_of_document_id.slice(0, 8)}…
+                </span>
               ) : null}
-            </dl>
-
-            <div>
-              <h4 className="font-semibold mb-2">{t.lineItems}</h4>
-              {(detailDoc.expense_items?.length ?? 0) === 0 ? (
-                <p className="text-muted-foreground">{t.noLines}</p>
-              ) : (
-                <ul className="divide-y border rounded-lg">
-                  {detailDoc.expense_items!.map((item) => (
-                    <li key={item.id} className="px-3 py-2 flex justify-between gap-2">
-                      <span>
-                        {item.line_no}. {item.description || '—'}
-                      </span>
-                      <span className="tabular-nums">{money(item.amount)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
+
+            <SalesInvoiceView
+              doc={detailDoc}
+              projectName={
+                projectOptions.find((p) => p.id === (detailDoc.project_id || projectId))
+                  ?.name ?? null
+              }
+              locale={isFa ? 'fa' : 'en'}
+              compact
+            />
 
             <div>
               <h4 className="font-semibold mb-2">{t.auditHistory}</h4>

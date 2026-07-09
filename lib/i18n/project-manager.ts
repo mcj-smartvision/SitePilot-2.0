@@ -1,5 +1,7 @@
 import type { FormLocale } from '@/lib/project-init/i18n/types'
+import { getPmRouteCopy } from '@/lib/shared/ai-action-routing'
 import type { AiDraftLabels } from '@/lib/shared/ai-types'
+import type { ApprovalItemType } from '@/lib/project-manager/types'
 
 const EN = {
   title: 'Project Manager Dashboard',
@@ -39,6 +41,8 @@ const EN = {
   editText: 'Edit',
   regenerate: 'Regenerate',
   rejectionReason: 'Rejection reason (optional)',
+  pendingYourReview: 'Awaiting your review',
+  fromSiteSupervisor: 'From Site Supervisor',
   aiInsight: 'AI Project Insight',
   generateInsight: 'Generate risk summary',
   departmentSite: 'Site',
@@ -47,6 +51,10 @@ const EN = {
   departmentQc: 'QC',
   departmentHse: 'HSE',
   openDashboard: 'Open dashboard',
+  typeInstruction: 'Work instruction → Subcontractor',
+  typePurchase: 'Purchase request → Procurement',
+  typeHse: 'HSE alert',
+  typeDailyReport: 'Daily report',
 }
 
 export type ProjectManagerMessages = typeof EN
@@ -89,6 +97,8 @@ const FA = {
   editText: 'ویرایش',
   regenerate: 'تولید مجدد',
   rejectionReason: 'دلیل رد (اختیاری)',
+  pendingYourReview: 'در انتظار بررسی شما',
+  fromSiteSupervisor: 'از سرپرست کارگاه',
   aiInsight: 'تحلیل ریسک AI',
   generateInsight: 'تولید خلاصه ریسک',
   departmentSite: 'کارگاه',
@@ -97,6 +107,10 @@ const FA = {
   departmentQc: 'QC',
   departmentHse: 'HSE',
   openDashboard: 'باز کردن داشبورد',
+  typeInstruction: 'دستور کار → پیمانکار',
+  typePurchase: 'درخواست خرید → تدارکات',
+  typeHse: 'هشدار HSE',
+  typeDailyReport: 'گزارش روزانه',
 } as const satisfies Record<keyof typeof EN, string>
 
 export function getProjectManagerMessages(locale: FormLocale): typeof EN {
@@ -113,5 +127,38 @@ export function pmAiLabels(t: ProjectManagerMessages): AiDraftLabels {
     reject: t.reject,
     regenerate: t.regenerate,
     saving: t.saving,
+  }
+}
+
+export function pmAiLabelsForItem(
+  t: ProjectManagerMessages,
+  type: ApprovalItemType,
+  locale: FormLocale
+): AiDraftLabels {
+  const route = getPmRouteCopy(type, locale === 'fa' || locale === 'ar' ? 'fa' : 'en')
+  return {
+    ...pmAiLabels(t),
+    approveSend: route.approveSend,
+    whatIsThis: route.whatIsThis,
+    destinationHint: route.destinationHint,
+    statusBadge: t.pendingYourReview,
+  }
+}
+
+export function pmApprovalTitle(
+  type: ApprovalItemType,
+  t: ProjectManagerMessages
+): string {
+  switch (type) {
+    case 'subcontractor_instruction':
+      return t.typeInstruction
+    case 'purchase_request':
+      return t.typePurchase
+    case 'hse_alert':
+      return t.typeHse
+    case 'daily_report':
+      return t.typeDailyReport
+    default:
+      return t.approvalCenter
   }
 }

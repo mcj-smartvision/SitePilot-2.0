@@ -5,6 +5,7 @@ import { Bot, Loader2 } from 'lucide-react'
 import { useLocale } from '@/components/i18n/locale-provider'
 import { PageHeader, LoadingBlock, ErrorBlock, SectionCard, EmptyState } from '@/components/admin/shared'
 import { ScheduleDateToolbar } from '@/components/schedule/schedule-date-toolbar'
+import { ScheduleDateInput } from '@/components/schedule/schedule-date-input'
 import { SupervisorSummaryCards } from '@/components/supervisor/supervisor-summary-cards'
 import { TodayActivitiesTable } from '@/components/supervisor/today-activities-table'
 import { LookaheadPanel } from '@/components/supervisor/lookahead-panel'
@@ -36,7 +37,10 @@ import {
   tasksToLookahead,
   tasksToTodayActivities,
 } from '@/lib/supervisor/transforms'
-import type { AiActionRow, TodayActivity } from '@/lib/supervisor/types'
+import { VoiceToTextButton } from '@/components/shared/voice-to-text-button'
+import { getSupervisorRouteCopy } from '@/lib/shared/ai-action-routing'
+import type { AiDraftLabels } from '@/lib/shared/ai-types'
+import type { AiActionRow, AiActionType, TodayActivity } from '@/lib/supervisor/types'
 import type { DashboardUserContext } from '@/types/dashboard'
 import type { ProjectAlert, ProjectTask } from '@/types/schedule'
 import { fetchAllProjectTasks, fetchUnresolvedAlerts } from '@/utils/schedule'
@@ -81,7 +85,23 @@ export function SiteSupervisorDashboard({
   const { locale, dir } = useLocale()
   const t = getSiteSupervisorMessages(locale)
   const isRtl = dir === 'rtl'
+  const isFa = locale === 'fa' || locale === 'ar'
   const { viewDate } = useScheduleViewDate()
+
+  function labelsForAction(type: AiActionType | 'daily_report'): AiDraftLabels {
+    const route = getSupervisorRouteCopy(type, isFa ? 'fa' : 'en')
+    return {
+      draftByAi: t.draftByAi,
+      confirmed: t.confirmed,
+      approveSend: route.approveSend,
+      editText: t.editText,
+      reject: t.reject,
+      regenerate: t.regenerate,
+      saving: t.saving,
+      whatIsThis: route.whatIsThis,
+      destinationHint: route.destinationHint,
+    }
+  }
 
   const [projectId, setProjectId] = useState<string | null>(initialProjectId)
   const [tasks, setTasks] = useState(initialTasks)
@@ -183,7 +203,16 @@ export function SiteSupervisorDashboard({
         payload = { severity: hseSeverity, description: hseDesc }
       } else if (type === 'instruction') {
         const task = tasks.find((x) => x.id === actionTaskId)
-        payload = { activity_name: task?.name ?? 'Activity', instruction: instructionText }
+        const todayRow = todayActivities.find((a) => a.id === actionTaskId)
+        payload = {
+          activity_name: task?.name ?? todayRow?.name ?? 'Activity',
+          wbs_code: task?.wbs_code ?? todayRow?.wbs_code ?? '',
+          subcontractor_name: todayRow?.subcontractor_name ?? '',
+          instruction: instructionText,
+          progress_percent: todayRow?.actual_progress_percent ?? task?.percent_complete ?? 0,
+          planned_status: todayRow?.planned_status ?? '',
+          is_critical: todayRow?.is_critical ?? task?.is_critical ?? false,
+        }
       }
 
       const actionType =
@@ -333,7 +362,7 @@ export function SiteSupervisorDashboard({
                 <AiDraftViewer
                   text={draft.text_generated}
                   status={draft.status}
-                  labels={t}
+                  labels={labelsForAction(draft.type)}
                   onApprove={async (text) => {
                     if (text !== draft.text_generated) {
                       await updateAiActionText(supabase, draft.id, text)
@@ -411,10 +440,11 @@ export function SiteSupervisorDashboard({
                     <Input value={purchaseUnit} onChange={(e) => setPurchaseUnit(e.target.value)} />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Needed date</Label>
-                  <Input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
-                </div>
+                <ScheduleDateInput
+                  label="Needed date"
+                  valueIso={purchaseDate}
+                  onChangeIso={setPurchaseDate}
+                />
                 <div className="space-y-2">
                   <Label>Reason</Label>
                   <Textarea rows={3} value={purchaseReason} onChange={(e) => setPurchaseReason(e.target.value)} />
@@ -456,7 +486,30 @@ export function SiteSupervisorDashboard({
               </>
             ) : null}
             {actionDialog === 'instruction' ? (
-              <Textarea rows={5} value={instructionText} onChange={(e) => setInstructionText(e.target.value)} placeholder="Instruction to subcontractor..." />
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground leading-relaxed rounded-md border bg-muted/30 px-3 py-2">
+                  {isFa
+                    ? 'این دکمه «دستور کار» برای پیمانکار/اجراکننده همان فعالیت است. متن پیش‌نویس AI ساخته می‌شود؛ بعد از تأیید شما به مدیر پروژه می‌رود. ابلاغ نهایی فقط وقتی ممکن است که مدیر پروژه پیمانکار را قبلاً معرفی کرده باشد.'
+                    : 'Work instruction for the subcontractor/crew. After you approve, it goes to the Project Manager. Final release requires a registered subcontractor.'}
+                </p>
+                <div className="flex justify-end">
+                  <VoiceToTextButton
+                    onTranscript={(text) =>
+                      setInstructionText((prev) => (prev ? `${prev}\n${text}` : text))
+                    }
+                  />
+                </div>
+                <Textarea
+                  rows={5}
+                  value={instructionText}
+                  onChange={(e) => setInstructionText(e.target.value)}
+                  placeholder={
+                    isFa
+                      ? 'جزئیات دستور به پیمانکار (اختیاری — صدا یا تایپ)…'
+                      : 'Instruction details (optional — voice or type)…'
+                  }
+                />
+              </div>
             ) : null}
             <Button type="button" className="w-full" disabled={actionLoading} onClick={() => void handleCreateAction(actionDialog)}>
               {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t.submitReport}
@@ -466,7 +519,7 @@ export function SiteSupervisorDashboard({
           <AiDraftViewer
             text={generatedAction.text_generated}
             status={generatedAction.status}
-            labels={t}
+            labels={labelsForAction(generatedAction.type)}
             loading={actionLoading}
             onApprove={async (text) => {
               setActionLoading(true)

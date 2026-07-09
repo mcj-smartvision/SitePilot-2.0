@@ -10,4 +10,10 @@ export interface AiDraftLabels {
   reject: string
   regenerate?: string
   saving: string
+  /** Explains what this draft is */
+  whatIsThis?: string
+  /** Explains where approve/send goes */
+  destinationHint?: string
+  /** Override badge text (e.g. PM pending review) */
+  statusBadge?: string
 }

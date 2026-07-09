@@ -26,6 +26,8 @@ export interface ProjectTask {
   baseline_finish: string | null
   percent_complete: number
   is_critical: boolean
+  /** Registered project subcontractor (migration 42) */
+  subcontractor_id?: string | null
   created_at: string
   updated_at: string
 }

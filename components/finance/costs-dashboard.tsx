@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { FormattedDate } from '@/components/schedule/formatted-date'
+import { ScheduleDateInput } from '@/components/schedule/schedule-date-input'
 import { MoneyInput, parseMoneyInput } from '@/components/finance/money-input'
 import { useSupabase } from '@/hooks/useSupabase'
 import {
@@ -236,12 +237,18 @@ export function CostsDashboard({
             />
           </div>
           <div className="space-y-2">
-            <Label>From date</Label>
-            <Input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} />
+            <ScheduleDateInput
+              label="From date"
+              valueIso={filterDateFrom}
+              onChangeIso={setFilterDateFrom}
+            />
           </div>
           <div className="space-y-2">
-            <Label>To date</Label>
-            <Input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
+            <ScheduleDateInput
+              label="To date"
+              valueIso={filterDateTo}
+              onChangeIso={setFilterDateTo}
+            />
           </div>
         </div>
 
@@ -250,8 +257,12 @@ export function CostsDashboard({
             <p className="text-sm font-semibold">New cost record</p>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
-                <Label>Date</Label>
-                <Input type="date" required value={formDate} onChange={(e) => setFormDate(e.target.value)} />
+                <ScheduleDateInput
+                  label="Date"
+                  valueIso={formDate}
+                  onChangeIso={setFormDate}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label>Type</Label>

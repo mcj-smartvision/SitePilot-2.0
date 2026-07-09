@@ -47,8 +47,13 @@ import { buildExecutiveSummary, phaseLabelFa } from '@/lib/managerial/build-exec
 import { ExecutiveLayer } from '@/components/managerial/executive-layer'
 import { ActionNowBox } from '@/components/managerial/action-now-box'
 import { RecentReportsPanel } from '@/components/managerial/recent-reports-panel'
+import { PmControlKpis } from '@/components/project-manager/pm-control-kpis'
+import { PmDataGapsPanel } from '@/components/project-manager/pm-data-gaps-panel'
+import { PmPlanComplianceTable } from '@/components/project-manager/pm-plan-compliance-table'
 import { UiBlockGuard } from '@/components/dashboard/ui-block-visibility'
 import { PM_KPI_BLOCK_CODE } from '@/lib/dashboard/ui-block-catalog'
+import type { PmDataGap } from '@/lib/project-manager/data-gaps'
+import type { PlanComplianceSummary } from '@/lib/project-manager/plan-compliance'
 import type { ProjectHealthStatus } from '@/lib/project-manager/types'
 import type { ProjectAlert, ProjectScheduleSummary, SiteDailyReport } from '@/types/schedule'
 import { cn } from '@/lib/utils'
@@ -59,10 +64,13 @@ interface PmAnalyticsControlRoomProps {
   health: ProjectHealthStatus
   alerts: ProjectAlert[]
   reports?: SiteDailyReport[]
+  compliance?: PlanComplianceSummary | null
+  dataGaps?: PmDataGap[]
   projectOptions: { id: string; name: string }[]
   projectId: string | null
   onProjectChange?: (id: string) => void
   isRtl?: boolean
+  isFa?: boolean
 }
 
 function TrendIcon({ value }: { value: number }) {
@@ -201,10 +209,13 @@ export function PmAnalyticsControlRoom({
   health,
   alerts,
   reports = [],
+  compliance = null,
+  dataGaps = [],
   projectOptions,
   projectId,
   onProjectChange,
   isRtl,
+  isFa = true,
 }: PmAnalyticsControlRoomProps) {
   const [range, setRange] = useState('14')
 
@@ -214,8 +225,8 @@ export function PmAnalyticsControlRoom({
   )
 
   const analytics = useMemo(
-    () => buildPmAnalytics(projectName, summary, health, alerts),
-    [projectName, summary, health, alerts]
+    () => buildPmAnalytics(projectName, summary, health, alerts, compliance),
+    [projectName, summary, health, alerts, compliance]
   )
 
   const trendData = useMemo(() => {
@@ -227,8 +238,23 @@ export function PmAnalyticsControlRoom({
   const phaseFa = phaseLabelFa(summary.overallPercentComplete)
 
   return (
-    <div className={cn('space-y-8', isRtl && 'text-right')} dir="rtl">
+    <div className={cn('space-y-8', isRtl && 'text-right')} dir={isRtl ? 'rtl' : 'ltr'}>
       <ExecutiveLayer summary={executive} projectName={projectName} phaseFa={phaseFa} />
+
+      <UiBlockGuard code="PM-KPI-01">
+        <PmControlKpis
+          summary={summary}
+          health={health}
+          compliance={compliance}
+          isFa={isFa}
+        />
+      </UiBlockGuard>
+
+      {compliance ? (
+        <PmPlanComplianceTable compliance={compliance} isFa={isFa} isRtl={isRtl} />
+      ) : null}
+
+      {dataGaps.length > 0 ? <PmDataGapsPanel gaps={dataGaps} isFa={isFa} /> : null}
 
       <UiBlockGuard code="PM-ACT-01">
         <ActionNowBox actions={executive.prioritizedActions} />
@@ -316,9 +342,11 @@ export function PmAnalyticsControlRoom({
             <div className="mb-4">
               <h3 className="font-semibold flex items-center gap-2">
                 <Gauge className="h-5 w-5 text-primary" />
-                پیشرفت به تفکیک زون
+                وضعیت فعالیت‌های موعد تا امروز
               </h3>
-              <p className="text-xs text-muted-foreground mt-1">برنامه (خاکستری) در مقابل واقعی (نارنجی)</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                سهم انجام‌شده / مطابق / عقب / شروع‌نشده از فعالیت‌هایی که باید تا امروز شروع شده باشند
+              </p>
             </div>
             <div className="h-[260px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -328,13 +356,12 @@ export function PmAnalyticsControlRoom({
                   <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
                   <Tooltip contentStyle={{ borderRadius: 12 }} />
                   <Legend />
-                  <Bar dataKey="planned" name="برنامه %" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="actual" name="واقعی %" fill="#ea580c" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="actual" name="سهم از فعالیت‌های موعد %" fill="#ea580c" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <p className="text-xs text-muted-foreground mt-3 border-t pt-3">
-              فاصله زیاد بین ستون‌ها در یک زون یعنی انحراف اجرایی — اولویت بازبینی منابع در همان زون.
+              ستون «عقب از برنامه» و «شروع‌نشده» اولویت پیگیری مدیر پروژه هستند.
             </p>
           </div>
           </UiBlockGuard>
@@ -399,8 +426,8 @@ export function PmAnalyticsControlRoom({
       <div className="rounded-xl border border-dashed bg-muted/20 px-4 py-3 flex items-start gap-3 text-xs text-muted-foreground">
         <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
         <p>
-          شاخص‌ها از زمان‌بندی، انبار و هشدارهای میدانی محاسبه می‌شوند. روندها تا اتصال API زنده، بر اساس
-          مدل نمونه هستند — رنگ‌ها (سبز/نارنجی/قرمز) وضعیت را تفسیر می‌کنند، نه فقط عدد.
+          شاخص‌های کنترل از برنامه جاری، پیشرفت واقعی فعالیت‌ها، انبار و هشدارها محاسبه می‌شوند. روند
+          ۱۴روزه تقریبی است تا تاریخچه روزانه ذخیره شود. کمبود داده در پنل بالا با مسیر تکمیل مشخص شده است.
         </p>
       </div>
     </div>

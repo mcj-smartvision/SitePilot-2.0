@@ -134,48 +134,131 @@ export async function submitQuickReport(
   supabase: SupabaseClient,
   input: DailyReportInput,
   locale: 'fa' | 'en' = 'fa'
-): Promise<{ report: SiteDailyReport; summaryText: string }> {
-  const rawParts = [
-    input.supervisorNote ?? '',
-    ...input.activities.map(
-      (a) =>
-        `Task ${a.scheduleActivityId}: ${a.actualStatus} ${a.actualProgressPercent}% quality=${a.qualityStatus}`
-    ),
-  ].filter(Boolean)
+): Promise<{ report: SiteDailyReport; summaryText: string; reusedExisting: boolean }> {
+  const activityLines = input.activities.map(
+    (a) =>
+      `Task ${a.scheduleActivityId}: ${a.actualStatus} ${a.actualProgressPercent}% quality=${a.qualityStatus}`
+  )
+  const newRawChunk = [input.supervisorNote ?? '', ...activityLines].filter(Boolean).join('\n')
 
   const summaryText = await generateDailyReportSummary(input, locale)
 
-  const { data: report, error: reportError } = await supabase
+  // One report per project + day + supervisor (daily_reports_unique_day)
+  const { data: existing, error: existingError } = await supabase
     .from('daily_reports')
-    .insert({
-      project_id: input.siteId,
-      report_date: input.date,
-      site_supervisor_id: input.supervisorId,
-      raw_text: rawParts.join('\n'),
-      summary_text: summaryText,
-      ai_status: 'draft_by_ai',
-      ai_parsed: { summary: summaryText, tasks: [], issues: [], risks: [], materials: [] },
-    })
-    .select()
-    .single()
+    .select('*')
+    .eq('project_id', input.siteId)
+    .eq('report_date', input.date)
+    .eq('site_supervisor_id', input.supervisorId)
+    .maybeSingle()
 
-  if (reportError) throw new Error(reportError.message)
+  if (existingError && existingError.code !== 'PGRST116') {
+    throw new Error(existingError.message)
+  }
+
+  let report: SiteDailyReport
+  let reusedExisting = false
+
+  if (existing) {
+    reusedExisting = true
+    const prevRaw = String(existing.raw_text ?? '').trim()
+    const mergedRaw = [prevRaw, newRawChunk].filter(Boolean).join('\n\n')
+    const { data: updated, error: updateError } = await supabase
+      .from('daily_reports')
+      .update({
+        raw_text: mergedRaw,
+        summary_text: summaryText,
+        ai_status: 'draft_by_ai',
+        ai_parsed: { summary: summaryText, tasks: [], issues: [], risks: [], materials: [] },
+      })
+      .eq('id', existing.id)
+      .select()
+      .single()
+
+    if (updateError) throw new Error(updateError.message)
+    report = updated as SiteDailyReport
+  } else {
+    const { data: inserted, error: reportError } = await supabase
+      .from('daily_reports')
+      .insert({
+        project_id: input.siteId,
+        report_date: input.date,
+        site_supervisor_id: input.supervisorId,
+        raw_text: newRawChunk,
+        summary_text: summaryText,
+        ai_status: 'draft_by_ai',
+        ai_parsed: { summary: summaryText, tasks: [], issues: [], risks: [], materials: [] },
+      })
+      .select()
+      .single()
+
+    if (reportError) {
+      // Race: another insert won unique constraint — load existing and continue as update once
+      if (reportError.code === '23505' || /daily_reports_unique_day/i.test(reportError.message)) {
+        const { data: raced } = await supabase
+          .from('daily_reports')
+          .select('*')
+          .eq('project_id', input.siteId)
+          .eq('report_date', input.date)
+          .eq('site_supervisor_id', input.supervisorId)
+          .maybeSingle()
+        if (!raced) throw new Error(reportError.message)
+        const prevRaw = String(raced.raw_text ?? '').trim()
+        const mergedRaw = [prevRaw, newRawChunk].filter(Boolean).join('\n\n')
+        const { data: updated, error: updateError } = await supabase
+          .from('daily_reports')
+          .update({
+            raw_text: mergedRaw,
+            summary_text: summaryText,
+            ai_status: 'draft_by_ai',
+            ai_parsed: { summary: summaryText, tasks: [], issues: [], risks: [], materials: [] },
+          })
+          .eq('id', raced.id)
+          .select()
+          .single()
+        if (updateError) throw new Error(updateError.message)
+        report = updated as SiteDailyReport
+        reusedExisting = true
+      } else {
+        throw new Error(reportError.message)
+      }
+    } else {
+      report = inserted as SiteDailyReport
+    }
+  }
 
   if (input.activities.length > 0) {
-    const rows = input.activities.map((a) => ({
-      daily_report_id: report.id,
-      schedule_activity_id: a.scheduleActivityId,
-      planned_status: a.plannedStatus,
-      actual_status: a.actualStatus,
-      actual_progress_percent: a.actualProgressPercent,
-      quality_status: a.qualityStatus,
-      issues: a.issues,
-    }))
-
-    const { error: actError } = await supabase.from('daily_report_activities').insert(rows)
-    if (actError && actError.code !== '42P01') throw new Error(actError.message)
-
     for (const a of input.activities) {
+      const { data: existingAct } = await supabase
+        .from('daily_report_activities')
+        .select('id')
+        .eq('daily_report_id', report.id)
+        .eq('schedule_activity_id', a.scheduleActivityId)
+        .maybeSingle()
+
+      const actPayload = {
+        planned_status: a.plannedStatus,
+        actual_status: a.actualStatus,
+        actual_progress_percent: a.actualProgressPercent,
+        quality_status: a.qualityStatus,
+        issues: a.issues,
+      }
+
+      if (existingAct?.id) {
+        const { error: actError } = await supabase
+          .from('daily_report_activities')
+          .update(actPayload)
+          .eq('id', existingAct.id)
+        if (actError && actError.code !== '42P01') throw new Error(actError.message)
+      } else {
+        const { error: actError } = await supabase.from('daily_report_activities').insert({
+          daily_report_id: report.id,
+          schedule_activity_id: a.scheduleActivityId,
+          ...actPayload,
+        })
+        if (actError && actError.code !== '42P01') throw new Error(actError.message)
+      }
+
       await supabase.from('task_progress_updates').insert({
         project_id: input.siteId,
         task_id: a.scheduleActivityId,
@@ -185,10 +268,20 @@ export async function submitQuickReport(
         note: a.issues.length ? JSON.stringify(a.issues) : null,
         created_by: input.supervisorId,
       })
+
+      // Keep schedule task % in sync with quick report
+      await supabase
+        .from('project_tasks')
+        .update({
+          percent_complete: a.actualProgressPercent,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', a.scheduleActivityId)
+        .eq('project_id', input.siteId)
     }
   }
 
-  return { report: report as SiteDailyReport, summaryText }
+  return { report, summaryText, reusedExisting }
 }
 
 export async function confirmDailyReportDraft(

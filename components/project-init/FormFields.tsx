@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import { ScheduleDateInput } from '@/components/schedule/schedule-date-input'
 import {
   Select,
   SelectContent,
@@ -68,9 +69,36 @@ export function TextField<T extends FieldValues>({
 }: BaseFieldProps<T> & { type?: string; placeholder?: string }) {
   const {
     register,
+    control,
     formState: { errors },
   } = useFormContext<T>()
   const error = errors[name]?.message as string | undefined
+
+  // Calendar-aware date fields follow the header Jalali/Gregorian switcher
+  if (type === 'date') {
+    return (
+      <FieldWrapper
+        label={label}
+        required={required}
+        description={description}
+        error={error}
+        className={className}
+      >
+        <Controller
+          name={name}
+          control={control}
+          render={({ field }) => (
+            <ScheduleDateInput
+              id={String(name)}
+              valueIso={typeof field.value === 'string' ? field.value : ''}
+              onChangeIso={field.onChange}
+              required={required}
+            />
+          )}
+        />
+      </FieldWrapper>
+    )
+  }
 
   return (
     <FieldWrapper label={label} required={required} description={description} error={error} className={className}>

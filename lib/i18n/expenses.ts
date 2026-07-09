@@ -70,7 +70,7 @@ const EN = {
   reasonRequired: 'Reason is required.',
   amountRequired: 'Amount must be greater than zero.',
   // Detail
-  detailTitle: 'Document detail',
+  detailTitle: 'Sales invoice',
   auditHistory: 'Audit / revisions',
   lineItems: 'Line items',
   noLines: 'No line items.',
@@ -101,6 +101,19 @@ const EN = {
   migrateLegacy: 'Import previous costs',
   migrateSuccess: 'Previous costs imported into Expense Management.',
   activeProject: 'Active project',
+  // AI scan
+  scanTitle: 'Scan invoice / receipt',
+  scanHint:
+    'Take a photo or upload an image. AI fills the form as a draft — review and edit before saving.',
+  takePhoto: 'Take photo',
+  uploadPhoto: 'Upload image',
+  analyzeWithAi: 'Analyze with AI',
+  analyzing: 'Analyzing…',
+  analyzeError: 'Could not read the document. Fill the form manually or try another photo.',
+  analyzeSuccess: 'Fields pre-filled from the image. Please review before saving.',
+  clearScan: 'Clear photo',
+  aiDraftBadge: 'AI draft — confirm before save',
+  invoicePreview: 'Invoice preview — compare with the photo before saving',
 } as const
 
 const FA = {
@@ -166,7 +179,7 @@ const FA = {
   reason: 'دلیل',
   reasonRequired: 'وارد کردن دلیل الزامی است.',
   amountRequired: 'مبلغ باید بزرگ‌تر از صفر باشد.',
-  detailTitle: 'جزئیات سند',
+  detailTitle: 'فاکتور فروش',
   auditHistory: 'تاریخچه / نسخه‌ها',
   lineItems: 'ردیف‌های هزینه',
   noLines: 'ردیفی ثبت نشده است.',
@@ -194,6 +207,18 @@ const FA = {
   migrateLegacy: 'انتقال هزینه‌های قبلی',
   migrateSuccess: 'هزینه‌های قبلی به مدیریت هزینه‌ها منتقل شد.',
   activeProject: 'پروژه فعال',
+  scanTitle: 'اسکن فاکتور / رسید',
+  scanHint:
+    'عکس بگیرید یا تصویر آپلود کنید. هوش مصنوعی فرم را به‌صورت پیش‌نویس پر می‌کند — قبل از ذخیره بررسی و ویرایش کنید.',
+  takePhoto: 'عکس گرفتن',
+  uploadPhoto: 'آپلود تصویر',
+  analyzeWithAi: 'تحلیل با هوش مصنوعی',
+  analyzing: 'در حال تحلیل…',
+  analyzeError: 'خواندن سند ممکن نشد. فرم را دستی پر کنید یا عکس دیگری بگیرید.',
+  analyzeSuccess: 'فیلدها از روی تصویر پر شد. قبل از ذخیره حتماً بررسی کنید.',
+  clearScan: 'پاک کردن عکس',
+  aiDraftBadge: 'پیش‌نویس هوش مصنوعی — قبل از ذخیره تأیید کنید',
+  invoicePreview: 'پیش‌نمایش فاکتور — قبل از ذخیره با عکس مقایسه کنید',
 } as const
 
 const STATUS_FA: Record<AccountingDocumentStatus, string> = {

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useLocale } from '@/components/i18n/locale-provider'
 import { FormattedDate } from '@/components/schedule/formatted-date'
+import { ScheduleDateInput } from '@/components/schedule/schedule-date-input'
 import { PageHeader, LoadingBlock, ErrorBlock, SectionCard } from '@/components/admin/shared'
 import { StatCard } from '@/components/admin/stat-card'
 import { Button } from '@/components/ui/button'
@@ -498,16 +499,12 @@ export function StorekeeperDashboard({
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2 rounded-xl border bg-muted/20 p-4">
             <div className="space-y-2">
-              <Label htmlFor="invoice-date">
-                {t.invoiceDate} <span className="text-destructive">*</span>
-              </Label>
-              <Input
+              <ScheduleDateInput
                 id="invoice-date"
-                type="date"
+                label={`${t.invoiceDate} *`}
+                valueIso={invoiceDate}
+                onChangeIso={setInvoiceDate}
                 required
-                value={invoiceDate}
-                onChange={(e) => setInvoiceDate(e.target.value)}
-                className="h-10"
               />
             </div>
             <div className="space-y-2">

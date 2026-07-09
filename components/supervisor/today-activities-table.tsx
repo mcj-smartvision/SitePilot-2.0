@@ -86,7 +86,14 @@ export function TodayActivitiesTable({
                     <Button type="button" size="sm" variant="outline" onClick={() => onOpenQuickReport(a.id)}>
                       {labels.quickReport}
                     </Button>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => onCreateInstruction(a.id)}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      title={labels.aiInstruction}
+                      aria-label={labels.aiInstruction}
+                      onClick={() => onCreateInstruction(a.id)}
+                    >
                       <MessageSquare className="h-3.5 w-3.5" />
                     </Button>
                   </div>

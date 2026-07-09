@@ -1,3 +1,4 @@
+import type { PlanComplianceSummary } from '@/lib/project-manager/plan-compliance'
 import type { ProjectHealthStatus } from '@/lib/project-manager/types'
 import type { ProjectAlert, ProjectScheduleSummary } from '@/types/schedule'
 
@@ -103,26 +104,66 @@ function buildTrendSeries(wsi: number, mrs: number, csi: number): TrendPoint[] {
   return points
 }
 
+function buildStatusBuckets(compliance: PlanComplianceSummary | null | undefined): ZoneProgress[] {
+  if (!compliance || compliance.totalDue === 0) {
+    return [
+      { zone: 'انجام‌شده', planned: 0, actual: 0, readiness: 0 },
+      { zone: 'مطابق برنامه', planned: 0, actual: 0, readiness: 0 },
+      { zone: 'عقب از برنامه', planned: 0, actual: 0, readiness: 0 },
+      { zone: 'شروع‌نشده', planned: 0, actual: 0, readiness: 0 },
+    ]
+  }
+  const total = compliance.totalDue
+  const pct = (n: number) => Math.round((n / total) * 100)
+  // planned = share of due set; actual = same count share (single-metric bars)
+  return [
+    { zone: 'انجام‌شده', planned: pct(compliance.done), actual: pct(compliance.done), readiness: 100 },
+    { zone: 'مطابق برنامه', planned: pct(compliance.onTrack), actual: pct(compliance.onTrack), readiness: 85 },
+    { zone: 'عقب از برنامه', planned: pct(compliance.behind), actual: pct(compliance.behind), readiness: 40 },
+    {
+      zone: 'شروع‌نشده (باید شروع)',
+      planned: pct(compliance.notStarted),
+      actual: pct(compliance.notStarted),
+      readiness: 20,
+    },
+  ]
+}
+
 export function buildPmAnalytics(
   projectName: string,
   summary: ProjectScheduleSummary,
   health: ProjectHealthStatus,
-  alerts: ProjectAlert[]
+  alerts: ProjectAlert[],
+  compliance?: PlanComplianceSummary | null
 ): PmAnalyticsData {
+  const behindShare =
+    compliance && compliance.totalDue > 0
+      ? (compliance.behind + compliance.notStarted) / compliance.totalDue
+      : 0
+
   const wsi = clamp(
-    100 - summary.delayedTasks * 6 - health.shortageManpower * 15 - health.criticalDelayedActivities * 4
+    100 -
+      summary.delayedTasks * 6 -
+      health.shortageManpower * 15 -
+      health.criticalDelayedActivities * 4 -
+      Math.round(behindShare * 20)
   )
   const mrs = clamp(100 - health.shortageMaterials * 12 - (health.shortageMaterials > 2 ? 10 : 0))
+  const varianceGap = Math.max(0, health.plannedProgress - health.actualProgress)
   const csi = clamp(
-    health.actualProgress -
-      (health.plannedProgress - health.actualProgress) * 2 -
-      health.scheduleDelayDays * 8 -
-      health.criticalDelayedActivities * 5
+    100 -
+      varianceGap * 2.2 -
+      health.scheduleDelayDays * 6 -
+      health.criticalDelayedActivities * 4 -
+      Math.round(behindShare * 25)
   )
 
-  const wsiTrend = wsi - clamp(wsi + 18)
-  const mrsTrend = mrs - clamp(mrs + 6)
-  const csiTrend = csi - clamp(csi + 9)
+  const spi =
+    health.plannedProgress > 0
+      ? clamp((health.actualProgress / health.plannedProgress) * 100)
+      : health.actualProgress > 0
+        ? 100
+        : 0
 
   const kpis: AnalyticsKpi[] = [
     {
@@ -130,33 +171,33 @@ export function buildPmAnalytics(
       label: 'WSI',
       value: wsi,
       unit: '/100',
-      subtitle: 'Workforce Sufficiency Index',
+      subtitle: 'کفایت نیرو / پوشش جبهه‌های فعال',
       state: kpiState(wsi, 72, 55),
-      trend: -18,
+      trend: summary.delayedTasks > 0 ? -Math.min(20, summary.delayedTasks * 3) : 2,
       threshold: 70,
-      sparkline: buildSparkline(wsi, 18),
+      sparkline: buildSparkline(wsi, summary.delayedTasks > 0 ? 12 : 4),
     },
     {
       key: 'mrs',
       label: 'MRS',
       value: mrs,
       unit: '/100',
-      subtitle: 'Material Readiness Score',
+      subtitle: 'آمادگی مصالح (انبار)',
       state: kpiState(mrs, 75, 58),
-      trend: mrsTrend,
+      trend: health.shortageMaterials > 0 ? -Math.min(18, health.shortageMaterials * 4) : 1,
       threshold: 75,
-      sparkline: buildSparkline(mrs, 6),
+      sparkline: buildSparkline(mrs, health.shortageMaterials > 0 ? 8 : 3),
     },
     {
       key: 'csi',
       label: 'CSI',
       value: csi,
       unit: '/100',
-      subtitle: 'Schedule Control Integrity',
+      subtitle: `یکپارچگی زمان‌بندی · SPI≈${spi}%`,
       state: kpiState(csi, 70, 52),
-      trend: csiTrend,
+      trend: varianceGap > 5 ? -Math.min(20, varianceGap) : varianceGap < 0 ? 4 : 0,
       threshold: 72,
-      sparkline: buildSparkline(csi, 9),
+      sparkline: buildSparkline(csi, Math.max(3, varianceGap)),
     },
   ]
 
@@ -174,12 +215,7 @@ export function buildPmAnalytics(
           ? 'MEP & Finishes'
           : 'Commissioning'
 
-  const zoneProgress: ZoneProgress[] = [
-    { zone: 'Zone A — Foundation', planned: 92, actual: clamp(summary.overallPercentComplete + 8), readiness: mrs },
-    { zone: 'Zone B — Structure', planned: 78, actual: clamp(summary.overallPercentComplete), readiness: clamp(mrs - 8) },
-    { zone: 'Zone C — MEP', planned: 64, actual: clamp(summary.overallPercentComplete - 12), readiness: clamp(mrs - 15) },
-    { zone: 'Zone D — Finishes', planned: 41, actual: clamp(summary.overallPercentComplete - 22), readiness: clamp(mrs - 5) },
-  ]
+  const zoneProgress = buildStatusBuckets(compliance)
 
   const readinessBreakdown: ReadinessSlice[] = [
     { name: 'Workforce', value: wsi, color: '#059669' },
@@ -245,34 +281,44 @@ export function buildPmAnalytics(
     })
   }
 
-  const insights: InsightCard[] = [
-    {
-      id: 'wsi-drop',
-      text: `WSI در ۷ روز گذشته ۱۸٪ کاهش یافته — پوشش نیرو از تقاضای lookahead عقب است`,
-      severity: wsi < 55 ? 'critical' : 'warning',
-      metric: 'WSI',
-    },
-    {
-      id: 'mrs-zones',
-      text: `MRS در ${zoneProgress.filter((z) => z.readiness < 75).length || 1} زون فعال زیر آستانه است`,
+  const insights: InsightCard[] = []
+  if (compliance?.shouldShowChecklist) {
+    insights.push({
+      id: 'compliance',
+      text: `از ${compliance.totalDue} فعالیتِ موعد تا امروز: ${compliance.done} انجام‌شده، ${compliance.onTrack} مطابق، ${compliance.behind} عقب، ${compliance.notStarted} شروع‌نشده`,
+      severity: compliance.behind > 0 || compliance.notStarted > 0 ? 'warning' : 'info',
+      metric: 'Plan',
+    })
+  } else {
+    insights.push({
+      id: 'compliance-gate',
+      text: 'چک‌لیست انطباق تا امروز فعال نیست — تاریخ واقعی شروع پروژه را در زمان‌بندی ثبت کنید',
+      severity: 'warning',
+      metric: 'Plan',
+    })
+  }
+  insights.push({
+    id: 'spi',
+    text: `SPI تقریبی ${spi}% (واقعی ${health.actualProgress}% در برابر برنامه ${health.plannedProgress}% تا امروز)`,
+    severity: spi < 80 ? 'critical' : spi < 95 ? 'warning' : 'info',
+    metric: 'CSI',
+  })
+  if (health.shortageMaterials > 0) {
+    insights.push({
+      id: 'mrs-stock',
+      text: `${health.shortageMaterials} قلم انبار زیر حداقل — MRS=${mrs}`,
       severity: mrs < 58 ? 'critical' : 'warning',
       metric: 'MRS',
-    },
-    {
-      id: 'cp-delay',
-      text: `فعالیت مسیر بحرانی ${Math.max(health.scheduleDelayDays, 1)} روز از baseline عقب است`,
-      severity: health.scheduleDelayDays > 2 ? 'critical' : 'warning',
-      metric: 'CSI',
-    },
-    {
-      id: 'risk-week',
-      text:
-        overallStatus === 'on_track'
-          ? 'پروفایل ریسک نسبت به هفته قبل پایدار — MRS زون C را زیر نظر بگیرید'
-          : 'ریسک تأخیر نسبت به هفته قبل افزایش یافته — اقدام مدیریتی توصیه می‌شود',
-      severity: overallStatus === 'critical' ? 'critical' : overallStatus === 'at_risk' ? 'warning' : 'info',
-    },
-  ]
+    })
+  }
+  insights.push({
+    id: 'risk-week',
+    text:
+      overallStatus === 'on_track'
+        ? 'وضعیت کنترل پروژه پایدار است — روی فعالیت‌های مسیر بحرانی تمرکز کنید'
+        : 'ریسک تأخیر بالاست — اولویت با فعالیت‌های عقب‌مانده و تأییدهای باز است',
+    severity: overallStatus === 'critical' ? 'critical' : overallStatus === 'at_risk' ? 'warning' : 'info',
+  })
 
   return {
     projectName,

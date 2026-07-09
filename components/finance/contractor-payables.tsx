@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { AlertTriangle, Loader2, Plus, Wallet } from 'lucide-react'
 import { useLocale } from '@/components/i18n/locale-provider'
 import { FormattedDate } from '@/components/schedule/formatted-date'
+import { ScheduleDateInput } from '@/components/schedule/schedule-date-input'
 import {
   PageHeader,
   LoadingBlock,
@@ -482,17 +483,19 @@ export function ContractorPayables({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>{t.billDate}</Label>
-              <Input
-                type="date"
-                value={formBillDate}
-                onChange={(e) => setFormBillDate(e.target.value)}
+              <ScheduleDateInput
+                label={t.billDate}
+                valueIso={formBillDate}
+                onChangeIso={setFormBillDate}
                 required
               />
             </div>
             <div className="space-y-1.5">
-              <Label>{t.dueDate}</Label>
-              <Input type="date" value={formDue} onChange={(e) => setFormDue(e.target.value)} />
+              <ScheduleDateInput
+                label={t.dueDate}
+                valueIso={formDue}
+                onChangeIso={setFormDue}
+              />
             </div>
           </div>
           <div className="space-y-1.5">
@@ -533,11 +536,10 @@ export function ContractorPayables({
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>{t.paymentDate}</Label>
-                <Input
-                  type="date"
-                  value={payDate}
-                  onChange={(e) => setPayDate(e.target.value)}
+                <ScheduleDateInput
+                  label={t.paymentDate}
+                  valueIso={payDate}
+                  onChangeIso={setPayDate}
                   required
                 />
               </div>

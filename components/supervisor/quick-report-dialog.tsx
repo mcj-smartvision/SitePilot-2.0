@@ -22,6 +22,9 @@ import type {
   TodayActivity,
 } from '@/lib/supervisor/types'
 import type { SiteSupervisorMessages } from '@/lib/i18n/site-supervisor'
+import { VoiceToTextButton } from '@/components/shared/voice-to-text-button'
+import { getSupervisorRouteCopy } from '@/lib/shared/ai-action-routing'
+import type { AiDraftLabels } from '@/lib/shared/ai-types'
 
 interface QuickReportDialogProps {
   open: boolean
@@ -74,6 +77,21 @@ export function QuickReportDialog({
   }, [activity, open])
 
   if (!activity) return null
+
+  const reportLabels: AiDraftLabels = (() => {
+    const route = getSupervisorRouteCopy('daily_report', locale)
+    return {
+      draftByAi: labels.draftByAi,
+      confirmed: labels.confirmed,
+      approveSend: route.approveSend,
+      editText: labels.editText,
+      reject: labels.reject,
+      regenerate: labels.regenerate,
+      saving: labels.saving,
+      whatIsThis: route.whatIsThis,
+      destinationHint: route.destinationHint,
+    }
+  })()
 
   async function handleGenerate() {
     setLoading(true)
@@ -173,12 +191,24 @@ export function QuickReportDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="issue">{labels.issueNote}</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="issue">{labels.issueNote}</Label>
+              <VoiceToTextButton
+                onTranscript={(text) => setIssueNote((prev) => (prev ? `${prev} ${text}` : text))}
+              />
+            </div>
             <Textarea id="issue" rows={2} value={issueNote} onChange={(e) => setIssueNote(e.target.value)} />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="note">{labels.supervisorNote}</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="note">{labels.supervisorNote}</Label>
+              <VoiceToTextButton
+                onTranscript={(text) =>
+                  setSupervisorNote((prev) => (prev ? `${prev} ${text}` : text))
+                }
+              />
+            </div>
             <Textarea id="note" rows={2} value={supervisorNote} onChange={(e) => setSupervisorNote(e.target.value)} />
           </div>
 
@@ -200,7 +230,7 @@ export function QuickReportDialog({
         <AiDraftViewer
           text={summaryText}
           status="draft_by_ai"
-          labels={labels}
+          labels={reportLabels}
           loading={loading}
           onApprove={async (text) => {
             if (!reportId) return

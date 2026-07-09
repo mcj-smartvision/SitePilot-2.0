@@ -37,5 +37,17 @@ export function getRoleNavLinks(context: DashboardUserContext): RoleNavLink[] {
     })
   }
 
+  // Project Manager also gets subcontractors registry
+  if (
+    (context.isSystemAdmin || context.positionKeys.includes('project_manager')) &&
+    !seen.has('/project/subcontractors')
+  ) {
+    links.push({
+      href: '/project/subcontractors',
+      label: 'Subcontractors',
+      roleKey: 'project_manager',
+    })
+  }
+
   return links
 }

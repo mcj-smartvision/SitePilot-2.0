@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useLocale } from '@/components/i18n/locale-provider'
 import { FormattedDate } from '@/components/schedule/formatted-date'
+import { ScheduleDateInput } from '@/components/schedule/schedule-date-input'
 import {
   PageHeader,
   LoadingBlock,
@@ -697,24 +698,18 @@ export function AccountantDashboard({
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>{t.periodStart}</Label>
-                <Input
-                  type="date"
-                  required
-                  value={formPeriodStart}
-                  onChange={(e) => setFormPeriodStart(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>{t.periodEnd}</Label>
-                <Input
-                  type="date"
-                  required
-                  value={formPeriodEnd}
-                  onChange={(e) => setFormPeriodEnd(e.target.value)}
-                />
-              </div>
+              <ScheduleDateInput
+                label={t.periodStart}
+                valueIso={formPeriodStart}
+                onChangeIso={setFormPeriodStart}
+                required
+              />
+              <ScheduleDateInput
+                label={t.periodEnd}
+                valueIso={formPeriodEnd}
+                onChangeIso={setFormPeriodEnd}
+                required
+              />
             </div>
             <div className="space-y-2">
               <Label>{t.grossAmount}</Label>
@@ -786,14 +781,11 @@ export function AccountantDashboard({
                   <Label>{t.retentionHeld}</Label>
                   <MoneyInput value={editRetention} onChange={setEditRetention} />
                 </div>
-                <div className="space-y-2">
-                  <Label>{t.dueDate}</Label>
-                  <Input
-                    type="date"
-                    value={editDueDate}
-                    onChange={(e) => setEditDueDate(e.target.value)}
-                  />
-                </div>
+                <ScheduleDateInput
+                  label={t.dueDate}
+                  valueIso={editDueDate}
+                  onChangeIso={setEditDueDate}
+                />
               </div>
               <div className="flex gap-2 pt-2">
                 <Button type="submit" disabled={saving} className="flex-1">
