@@ -1,0 +1,173 @@
+import type { FormLocale } from '@/lib/project-init/i18n/types'
+import type { FinancialInvoiceStatus, VendorBillStatus } from '@/lib/finance/invoice-types'
+import { getPayableStatusLabel } from '@/lib/i18n/payables'
+
+const EN = {
+  title: 'Accountant Dashboard',
+  description: 'Cash flow, client invoices, vendor payables, and warehouse valuation.',
+  totalInvoiced: 'Total Invoiced',
+  totalPaid: 'Collected',
+  outstandingReceivables: 'Approved & Outstanding',
+  unpaidVendorBills: 'Overdue Vendor Payables',
+  alertsTitle: 'Alerts & Urgent Actions',
+  noAlerts: 'No urgent financial alerts.',
+  invoicesTable: 'Client Invoices',
+  vendorBillsTitle: 'Vendor Bills & Stock Value',
+  vendorBillsTable: 'Unpaid Vendor Bills',
+  stockValuation: 'Total Warehouse Value (Rial)',
+  stockValuationHint: 'Sum of current stock × unit price per item',
+  newInvoice: 'New Client Invoice',
+  editFinancial: 'Edit Financial Status',
+  recordPayment: 'Record New Receipt',
+  invoiceNo: 'Invoice No.',
+  period: 'Period',
+  periodStart: 'Period Start',
+  periodEnd: 'Period End',
+  grossAmount: 'Gross Amount (Rial)',
+  invoiceDate: 'Invoice Date',
+  dueDate: 'Due Date',
+  amount: 'Requested Amount',
+  approvedAmount: 'Approved Amount',
+  paidAmount: 'Paid Amount',
+  retentionHeld: 'Retention / Deductions',
+  status: 'Status',
+  vendor: 'Vendor',
+  billDate: 'Bill Date',
+  remaining: 'Remaining',
+  save: 'Save',
+  cancel: 'Cancel',
+  saving: 'Saving…',
+  selectProject: 'Project',
+  noProject: 'No active project. Ask the admin to assign you as Project Accountant.',
+  loadError: 'Failed to load financial data.',
+  saveError: 'Failed to save.',
+  successSaved: 'Saved successfully.',
+  successPayment: 'Payment recorded.',
+  emptyInvoices: 'No client invoices yet.',
+  emptyVendorBills: 'No unpaid vendor bills.',
+  addInvoice: 'Register New Invoice',
+  paymentAmount: 'Receipt Amount (Rial)',
+  paymentHint: 'Amount will be added to paid total.',
+  alertApprovedUnpaid: 'Approved invoice with incomplete payment',
+  alertUnderReview: 'Invoice under review for too long',
+  alertVendorOverdue: 'Overdue vendor bill',
+  days: 'days',
+  overdue: 'Overdue',
+  delayed: 'Delayed',
+  costsTable: 'Cost Summary',
+  addCost: 'Register Cost',
+  emptyCosts: 'No cost records yet.',
+  costType: 'Cost Type',
+  costDate: 'Date',
+  costDescription: 'Description',
+  totalAc: 'Total Actual Cost (AC)',
+  costAmount: 'Amount (Rial)',
+  invoiceRef: 'Invoice Reference',
+  manageExpenses: 'Expense Management',
+  costsSummaryHint:
+    'Micro expenses (cement, plaster, materials, etc.) are managed in Expense Management — not listed here.',
+  costsByType: 'Cost by type',
+  openExpenseManagement: 'Open Expense Management',
+  managePayables: 'Contractor Payables',
+} as const
+
+const FA = {
+  title: 'داشبورد حسابداری',
+  description: 'جریان نقدینگی، صورت‌وضعیت‌های کارفرما، بدهی به تأمین‌کنندگان و ارزش انبار.',
+  totalInvoiced: 'کل صورت‌وضعیت‌های صادر شده',
+  totalPaid: 'وصول شده',
+  outstandingReceivables: 'تایید شده و معوق',
+  unpaidVendorBills: 'بدهی سررسید شده به تأمین‌کنندگان',
+  alertsTitle: 'اخطارها و اقدامات فوری',
+  noAlerts: 'اخطار مالی فوری وجود ندارد.',
+  invoicesTable: 'جدول صورت‌وضعیت‌های کارفرما',
+  vendorBillsTitle: 'بدهی‌ها و ارزش انبار',
+  vendorBillsTable: 'قبوض پرداخت‌نشده تأمین‌کنندگان',
+  stockValuation: 'ارزش ریالی کل موجودی انبار',
+  stockValuationHint: 'مجموع موجودی × قیمت واحد هر قلم',
+  newInvoice: 'ثبت صورت‌وضعیت جدید',
+  editFinancial: 'ویرایش وضعیت مالی',
+  recordPayment: 'ثبت دریافتی جدید',
+  invoiceNo: 'شماره صورت‌وضعیت',
+  period: 'دوره',
+  periodStart: 'شروع دوره',
+  periodEnd: 'پایان دوره',
+  grossAmount: 'مبلغ ناخالص (ریال)',
+  invoiceDate: 'تاریخ صورت‌وضعیت',
+  dueDate: 'سررسید',
+  amount: 'مبلغ درخواستی',
+  approvedAmount: 'مبلغ تأییدشده',
+  paidAmount: 'مبلغ وصول‌شده',
+  retentionHeld: 'سپرده / کسورات',
+  status: 'وضعیت',
+  vendor: 'تأمین‌کننده',
+  billDate: 'تاریخ فاکتور',
+  remaining: 'مانده',
+  save: 'ذخیره',
+  cancel: 'انصراف',
+  saving: 'در حال ذخیره…',
+  selectProject: 'پروژه',
+  noProject: 'پروژه فعالی وجود ندارد. از مدیر بخواهید شما را به‌عنوان حسابدار پروژه تعیین کند.',
+  loadError: 'بارگذاری اطلاعات مالی ناموفق بود.',
+  saveError: 'ذخیره ناموفق بود.',
+  successSaved: 'با موفقیت ذخیره شد.',
+  successPayment: 'دریافتی ثبت شد.',
+  emptyInvoices: 'هنوز صورت‌وضعیتی ثبت نشده است.',
+  emptyVendorBills: 'قبض پرداخت‌نشده‌ای وجود ندارد.',
+  addInvoice: 'ثبت صورت‌وضعیت جدید',
+  paymentAmount: 'مبلغ دریافتی (ریال)',
+  paymentHint: 'این مبلغ به مجموع وصول‌شده اضافه می‌شود.',
+  alertApprovedUnpaid: 'صورت‌وضعیت تأییدشده با پرداخت ناقص',
+  alertUnderReview: 'صورت‌وضعیت مدت‌ها در حال بررسی',
+  alertVendorOverdue: 'قبض تأمین‌کننده سررسید گذشته',
+  days: 'روز',
+  overdue: 'سررسید گذشته',
+  delayed: 'معوق',
+  costsTable: 'خلاصه هزینه‌ها',
+  addCost: 'ثبت هزینه',
+  emptyCosts: 'هنوز هزینه‌ای ثبت نشده است.',
+  costType: 'نوع هزینه',
+  costDate: 'تاریخ',
+  costDescription: 'شرح',
+  totalAc: 'جمع هزینه واقعی (AC)',
+  costAmount: 'مبلغ (ریال)',
+  invoiceRef: 'مرجع فاکتور',
+  manageExpenses: 'مدیریت هزینه‌ها',
+  costsSummaryHint:
+    'هزینه‌های خرد (سیمان، گچ، مصالح و …) در بخش مدیریت هزینه‌ها ثبت می‌شوند — در این داشبورد فقط خلاصه نمایش داده می‌شود.',
+  costsByType: 'هزینه به تفکیک نوع',
+  openExpenseManagement: 'ورود به مدیریت هزینه‌ها',
+  managePayables: 'بدهی پیمانکاران',
+} as const
+
+const INVOICE_STATUS_FA: Record<FinancialInvoiceStatus, string> = {
+  draft: 'پیش‌نویس',
+  submitted: 'ارسال‌شده',
+  under_review: 'در حال بررسی',
+  approved: 'تأییدشده',
+  paid: 'پرداخت‌شده',
+}
+
+const INVOICE_STATUS_EN: Record<FinancialInvoiceStatus, string> = {
+  draft: 'Draft',
+  submitted: 'Submitted',
+  under_review: 'Under Review',
+  approved: 'Approved',
+  paid: 'Paid',
+}
+
+export function getAccountantMessages(locale: FormLocale) {
+  if (locale === 'fa' || locale === 'ar') return FA
+  return EN
+}
+
+export type AccountantMessages = typeof EN
+
+export function getInvoiceStatusLabel(status: FinancialInvoiceStatus, locale: FormLocale): string {
+  if (locale === 'fa' || locale === 'ar') return INVOICE_STATUS_FA[status]
+  return INVOICE_STATUS_EN[status]
+}
+
+export function getVendorStatusLabel(status: VendorBillStatus, locale: FormLocale): string {
+  return getPayableStatusLabel(status, locale)
+}

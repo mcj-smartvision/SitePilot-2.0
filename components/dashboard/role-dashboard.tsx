@@ -9,7 +9,7 @@ import { WidgetGrid, WidgetGridItem } from '@/components/widgets/widget-shell'
 import { PageHeader } from '@/components/admin/shared'
 import { Label } from '@/components/ui/label'
 import {
-  AdminUiBlockCatalogPanel,
+  UiBlockCustomizePanel,
   UiBlockGuard,
   UiBlockVisibilityProvider,
 } from '@/components/dashboard/ui-block-visibility'
@@ -45,9 +45,11 @@ export function RoleDashboard({
     <UiBlockVisibilityProvider
       visibleCodes={visibleBlockCodes}
       showAdminBlockCodes={showAdminBlockCodes}
+      dashboard="general"
+      projectId={context.projectId}
     >
       <div className="space-y-6">
-        <AdminUiBlockCatalogPanel dashboard="general" />
+        <UiBlockCustomizePanel />
 
         <PageHeader
           title={`${roleLabel} Dashboard`}

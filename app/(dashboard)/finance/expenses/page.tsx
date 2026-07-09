@@ -1,12 +1,11 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { loadRolePageData } from '@/lib/dashboard/load-role-page'
-import { loadUiBlockVisibility } from '@/lib/dashboard/load-ui-block-visibility'
 import { hasRoleDashboardAccess } from '@/lib/schedule/access'
-import { AccountantDashboard } from '@/components/finance/accountant-dashboard'
+import { ExpenseManagement } from '@/components/finance/expense-management'
 
-/** Project Accountant home — financial operations dashboard */
-export default async function AccountantDashboardPage() {
+/** Dedicated Expense Management — micro expenses live here, not on the accountant dashboard. */
+export default async function FinanceExpensesPage() {
   const supabase = createClient()
   const {
     data: { user },
@@ -21,30 +20,26 @@ export default async function AccountantDashboardPage() {
   )
 
   if (context.isFirstLogin) redirect('/first-login')
-  if (!hasRoleDashboardAccess(context, 'accountant') && !context.isSystemAdmin) {
-    redirect('/dashboard')
-  }
+
+  const canAccess =
+    context.isSystemAdmin ||
+    hasRoleDashboardAccess(context, 'accountant') ||
+    context.positionKeys.includes('project_manager')
+
+  if (!canAccess) redirect('/dashboard')
 
   const canEdit =
     context.isSystemAdmin ||
     context.positionKeys.includes('project_accountant') ||
     context.positionKeys.includes('finance_admin')
 
-  const visibleBlockCodes = await loadUiBlockVisibility(
-    supabase,
-    context,
-    activeProjectId,
-    'accountant'
-  )
-
   return (
-    <AccountantDashboard
+    <ExpenseManagement
       key={activeProjectId ?? 'no-project'}
       initialContext={context}
       projectOptions={projectOptions}
       initialProjectId={activeProjectId}
       canEdit={canEdit}
-      visibleBlockCodes={visibleBlockCodes}
     />
   )
 }

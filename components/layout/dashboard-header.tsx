@@ -27,21 +27,28 @@ export function DashboardHeader({ email, isAdmin, roleNavLinks = [] }: Dashboard
         { href: '/admin/members', label: 'Members' },
         { href: '/admin/projects', label: 'Projects' },
       ]
-    : [{ href: '/dashboard', label: 'Dashboard' }]
+    : []
 
   const roleNav = roleNavLinks.map((link) => ({ href: link.href, label: link.label }))
-  const tailNav = [
-    { href: '/reports', label: app.reports },
-    { href: '/settings', label: app.settings },
-  ]
+  // Home = first role dashboard when available; otherwise generic /dashboard
+  const homeHref = isAdmin ? '/admin' : roleNav[0]?.href ?? '/dashboard'
+  // Reports removed from global nav — role dashboards own their own workflows
+  const tailNav = [{ href: '/settings', label: app.settings }]
 
-  const navItems = isAdmin ? [...baseNav, ...tailNav] : [...baseNav, ...roleNav, ...tailNav]
+  const navItems = isAdmin
+    ? [...baseNav, ...tailNav]
+    : [
+        ...(roleNav.length > 0
+          ? roleNav
+          : [{ href: '/dashboard', label: 'Dashboard' }]),
+        ...tailNav,
+      ]
 
   return (
     <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 shadow-sm">
       <div className="container mx-auto flex h-14 items-center justify-between gap-4 px-4">
         <nav className="flex min-w-0 items-center gap-1 sm:gap-2 overflow-x-auto">
-          <Link href={isAdmin ? '/admin' : '/dashboard'} className="flex items-center gap-2 font-bold shrink-0 mr-2">
+          <Link href={homeHref} className="flex items-center gap-2 font-bold shrink-0 mr-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <HardHat className="h-4 w-4" />
             </div>

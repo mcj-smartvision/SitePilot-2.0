@@ -16,8 +16,20 @@ export const FINANCIAL_COST_TYPE_LABELS: Record<FinancialCostType, string> = {
   overhead: 'Overhead',
 }
 
-export const FINANCIAL_INVOICE_STATUSES = ['draft', 'sent', 'approved', 'paid'] as const
-export type FinancialInvoiceStatus = (typeof FINANCIAL_INVOICE_STATUSES)[number]
+export {
+  FINANCIAL_INVOICE_STATUSES,
+  type FinancialInvoiceStatus,
+} from '@/lib/finance/invoice-types'
+
+export {
+  ACCOUNTING_DOCUMENT_STATUSES,
+  type AccountingDocumentStatus,
+  type AccountingDocument,
+  type ExpenseItem,
+  type ExpenseCategory,
+  isDocumentEditable,
+  isDocumentLocked,
+} from '@/lib/finance/expense-types'
 
 export interface FinancialCost {
   id: string

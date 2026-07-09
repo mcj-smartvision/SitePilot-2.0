@@ -7,7 +7,7 @@ export interface RoleNavLink {
   roleKey: SiteRoleKey
 }
 
-const ROLE_DASHBOARD_PATHS: Record<SiteRoleKey, string> = {
+const ROLE_DASHBOARD_PATHS: Partial<Record<SiteRoleKey | 'finance_admin', string>> = {
   project_manager: '/dashboard/project-manager',
   site_supervisor: '/dashboard/site-supervisor',
   storekeeper: '/dashboard/storekeeper',
@@ -17,6 +17,7 @@ const ROLE_DASHBOARD_PATHS: Record<SiteRoleKey, string> = {
   security: '/dashboard/security',
   client: '/dashboard',
   project_accountant: '/dashboard/accountant',
+  finance_admin: '/dashboard/accountant',
 }
 
 /** Navigation links visible in header based on assigned position keys. */

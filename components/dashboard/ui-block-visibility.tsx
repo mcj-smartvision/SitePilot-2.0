@@ -1,10 +1,20 @@
 'use client'
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
-import { ChevronDown, ChevronUp, Tags } from 'lucide-react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
+import { ChevronDown, ChevronUp, LayoutGrid, Loader2, Tags } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { getBlocksForDashboard, UI_BLOCK_BY_CODE, type UiBlockLayer } from '@/lib/dashboard/ui-block-catalog'
+import { cn } from '@/lib/utils'
+import { useSupabase } from '@/hooks/useSupabase'
+import { upsertMemberUiBlockPreference } from '@/lib/dashboard/member-ui-block-preferences'
 import {
   BLOCK_KIND_LABELS_FA,
   isUiBlockVisible,
@@ -21,32 +31,120 @@ interface UiBlockVisibilityContextValue {
   visibleCodes: Set<string> | null
   isVisible: (code: string) => boolean
   showAdminBlockCodes: boolean
+  canCustomize: boolean
+  dashboard: string | null
+  projectId: string | null
+  toggleBlock: (code: string, visible: boolean) => Promise<void>
+  togglingCode: string | null
+  toggleError: string | null
+  clearToggleError: () => void
 }
 
 const UiBlockVisibilityContext = createContext<UiBlockVisibilityContextValue>({
   visibleCodes: null,
   isVisible: (code) => isUiBlockVisible(undefined, code),
   showAdminBlockCodes: false,
+  canCustomize: false,
+  dashboard: null,
+  projectId: null,
+  toggleBlock: async () => {},
+  togglingCode: null,
+  toggleError: null,
+  clearToggleError: () => {},
 })
 
 export function UiBlockVisibilityProvider({
-  visibleCodes,
+  visibleCodes: initialVisibleCodes,
   showAdminBlockCodes = false,
+  dashboard = null,
+  projectId = null,
   children,
 }: {
   visibleCodes: string[] | Set<string> | null
   showAdminBlockCodes?: boolean
+  dashboard?: string | null
+  projectId?: string | null
   children: ReactNode
 }) {
-  const value = useMemo(() => {
-    const set =
-      visibleCodes instanceof Set ? visibleCodes : visibleCodes ? new Set(visibleCodes) : null
-    return {
-      visibleCodes: set,
-      isVisible: (code: string) => isUiBlockVisible(set ?? undefined, code),
+  const supabase = useSupabase()
+  const [visibleCodes, setVisibleCodes] = useState<Set<string> | null>(() => {
+    if (initialVisibleCodes instanceof Set) return initialVisibleCodes
+    if (initialVisibleCodes) return new Set(initialVisibleCodes)
+    return null
+  })
+  const [togglingCode, setTogglingCode] = useState<string | null>(null)
+  const [toggleError, setToggleError] = useState<string | null>(null)
+
+  const canCustomize = Boolean(dashboard && projectId)
+
+  const toggleBlock = useCallback(
+    async (code: string, visible: boolean) => {
+      if (!dashboard || !projectId) return
+
+      setToggleError(null)
+      setVisibleCodes((prev) => {
+        const next = new Set(prev ?? [])
+        if (visible) next.add(code)
+        else next.delete(code)
+        return next
+      })
+
+      setTogglingCode(code)
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) throw new Error('لطفاً دوباره وارد شوید')
+
+        await upsertMemberUiBlockPreference(supabase, {
+          userId: user.id,
+          projectId,
+          dashboard,
+          blockCode: code,
+          isVisible: visible,
+        })
+      } catch (err) {
+        setVisibleCodes((prev) => {
+          const next = new Set(prev ?? [])
+          if (visible) next.delete(code)
+          else next.add(code)
+          return next
+        })
+        setToggleError(err instanceof Error ? err.message : 'ذخیره تنظیمات ناموفق بود')
+      } finally {
+        setTogglingCode(null)
+      }
+    },
+    [dashboard, projectId, supabase]
+  )
+
+  const clearToggleError = useCallback(() => setToggleError(null), [])
+
+  const value = useMemo(
+    () => ({
+      visibleCodes,
+      isVisible: (code: string) => isUiBlockVisible(visibleCodes ?? undefined, code),
       showAdminBlockCodes,
-    }
-  }, [visibleCodes, showAdminBlockCodes])
+      canCustomize,
+      dashboard,
+      projectId,
+      toggleBlock,
+      togglingCode,
+      toggleError,
+      clearToggleError,
+    }),
+    [
+      visibleCodes,
+      showAdminBlockCodes,
+      canCustomize,
+      dashboard,
+      projectId,
+      toggleBlock,
+      togglingCode,
+      toggleError,
+      clearToggleError,
+    ]
+  )
 
   return (
     <UiBlockVisibilityContext.Provider value={value}>{children}</UiBlockVisibilityContext.Provider>
@@ -110,18 +208,26 @@ export function UiBlockGuard({
   )
 }
 
-/** Collapsible catalog index — admin only, top of role dashboards. */
-export function AdminUiBlockCatalogPanel({ dashboard }: { dashboard: string }) {
-  const { showAdminBlockCodes, isVisible } = useUiBlockVisibility()
-  const [open, setOpen] = useState(true)
+/** Personal dashboard layout panel — available to all members on role dashboards. */
+export function UiBlockCustomizePanel() {
+  const {
+    showAdminBlockCodes,
+    isVisible,
+    canCustomize,
+    dashboard,
+    toggleBlock,
+    togglingCode,
+    toggleError,
+    clearToggleError,
+  } = useUiBlockVisibility()
+  const [open, setOpen] = useState(false)
 
-  const blocks = useMemo(
-    () =>
-      getBlocksForDashboard(dashboard)
-        .filter((b) => b.dashboard === dashboard)
-        .sort((a, b) => a.sortOrder - b.sortOrder),
-    [dashboard]
-  )
+  const blocks = useMemo(() => {
+    if (!dashboard) return []
+    return getBlocksForDashboard(dashboard)
+      .filter((b) => b.dashboard === dashboard)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+  }, [dashboard])
 
   const byLayer = useMemo(() => {
     const map = new Map<UiBlockLayer, typeof blocks>()
@@ -133,9 +239,10 @@ export function AdminUiBlockCatalogPanel({ dashboard }: { dashboard: string }) {
     return map
   }, [blocks])
 
-  if (!showAdminBlockCodes || blocks.length === 0) return null
+  if (!canCustomize || blocks.length === 0) return null
 
   const layerOrder: UiBlockLayer[] = ['executive', 'analytical', 'operational', 'general']
+  const visibleCount = blocks.filter((b) => isVisible(b.code)).length
 
   return (
     <div
@@ -144,11 +251,17 @@ export function AdminUiBlockCatalogPanel({ dashboard }: { dashboard: string }) {
     >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-violet-100 px-4 py-3">
         <div className="flex items-center gap-2">
-          <Tags className="h-5 w-5 text-violet-700" />
+          {showAdminBlockCodes ? (
+            <Tags className="h-5 w-5 text-violet-700" />
+          ) : (
+            <LayoutGrid className="h-5 w-5 text-violet-700" />
+          )}
           <div>
-            <p className="text-sm font-bold text-violet-950">راهنمای کد بلوک‌ها (فقط ادمین)</p>
+            <p className="text-sm font-bold text-violet-950">
+              {showAdminBlockCodes ? 'راهنمای کد بلوک‌ها + شخصی‌سازی' : 'شخصی‌سازی داشبورد من'}
+            </p>
             <p className="text-xs text-muted-foreground">
-              {blocks.length} بلوک — روی هر بخش badge بنفش با کد (مثل PM-CHT-01) نمایش داده می‌شود
+              {visibleCount} از {blocks.length} بخش فعال — بلوک‌های غیرضروری را خاموش کنید تا داشبورد خلوت‌تر شود
             </p>
           </div>
         </div>
@@ -161,7 +274,7 @@ export function AdminUiBlockCatalogPanel({ dashboard }: { dashboard: string }) {
           ) : (
             <>
               <ChevronDown className="h-4 w-4 me-1" />
-              نمایش فهرست
+              تنظیم بلوک‌ها
             </>
           )}
         </Button>
@@ -169,6 +282,14 @@ export function AdminUiBlockCatalogPanel({ dashboard }: { dashboard: string }) {
 
       {open ? (
         <div className="space-y-4 p-4">
+          {toggleError ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-2">
+              <span>{toggleError}</span>
+              <Button type="button" variant="ghost" size="sm" onClick={clearToggleError}>
+                بستن
+              </Button>
+            </div>
+          ) : null}
           {layerOrder.map((layer) => {
             const layerBlocks = byLayer.get(layer)
             if (!layerBlocks?.length) return null
@@ -181,38 +302,68 @@ export function AdminUiBlockCatalogPanel({ dashboard }: { dashboard: string }) {
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/40 text-right text-xs text-muted-foreground">
-                        <th className="px-3 py-2 font-medium">کد</th>
-                        <th className="px-3 py-2 font-medium">نام فارسی</th>
+                        <th className="px-3 py-2 font-medium w-16">نمایش</th>
+                        {showAdminBlockCodes ? (
+                          <th className="px-3 py-2 font-medium">کد</th>
+                        ) : null}
+                        <th className="px-3 py-2 font-medium">نام بخش</th>
                         <th className="px-3 py-2 font-medium">نوع</th>
-                        <th className="px-3 py-2 font-medium">نمایش</th>
-                        <th className="px-3 py-2 font-medium">key</th>
+                        {showAdminBlockCodes ? (
+                          <th className="px-3 py-2 font-medium">key</th>
+                        ) : null}
                       </tr>
                     </thead>
                     <tbody>
                       {layerBlocks.map((block) => {
                         const visible = isVisible(block.code)
+                        const busy = togglingCode === block.code
                         return (
-                          <tr key={block.code} className="border-b last:border-0">
+                          <tr key={block.code} className="border-b last:border-0 hover:bg-muted/20">
                             <td className="px-3 py-2">
-                              <Badge
-                                variant="outline"
-                                className="font-mono text-[10px] bg-violet-50 text-violet-900 border-violet-200"
-                              >
-                                {block.code}
-                              </Badge>
+                              <div className="flex items-center justify-center">
+                                {busy ? (
+                                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    role="checkbox"
+                                    aria-checked={visible}
+                                    aria-label={block.titleFa}
+                                    disabled={busy}
+                                    onClick={() => void toggleBlock(block.code, !visible)}
+                                    className={cn(
+                                      'h-5 w-5 rounded border flex items-center justify-center transition-colors',
+                                      visible
+                                        ? 'border-primary bg-primary text-primary-foreground'
+                                        : 'border-input bg-background hover:bg-muted'
+                                    )}
+                                  >
+                                    {visible ? (
+                                      <span className="text-xs leading-none">✓</span>
+                                    ) : null}
+                                  </button>
+                                )}
+                              </div>
                             </td>
+                            {showAdminBlockCodes ? (
+                              <td className="px-3 py-2">
+                                <Badge
+                                  variant="outline"
+                                  className="font-mono text-[10px] bg-violet-50 text-violet-900 border-violet-200"
+                                >
+                                  {block.code}
+                                </Badge>
+                              </td>
+                            ) : null}
                             <td className="px-3 py-2 font-medium">{block.titleFa}</td>
                             <td className="px-3 py-2 text-muted-foreground">
                               {BLOCK_KIND_LABELS_FA[block.kind] ?? block.kind}
                             </td>
-                            <td className="px-3 py-2">
-                              <Badge variant={visible ? 'default' : 'secondary'} className="text-[10px]">
-                                {visible ? 'فعال' : 'مخفی'}
-                              </Badge>
-                            </td>
-                            <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">
-                              {block.key}
-                            </td>
+                            {showAdminBlockCodes ? (
+                              <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">
+                                {block.key}
+                              </td>
+                            ) : null}
                           </tr>
                         )
                       })}
@@ -227,3 +378,6 @@ export function AdminUiBlockCatalogPanel({ dashboard }: { dashboard: string }) {
     </div>
   )
 }
+
+/** @deprecated Use UiBlockCustomizePanel */
+export const AdminUiBlockCatalogPanel = UiBlockCustomizePanel

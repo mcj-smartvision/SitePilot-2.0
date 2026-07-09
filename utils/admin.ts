@@ -104,7 +104,7 @@ async function seedDefaultPositions(supabase: SupabaseClient, projectId: string)
   return seedProjectPositions(supabase, projectId)
 }
 
-/** Idempotent seed of 22 default construction site positions for a project. */
+/** Idempotent seed of default construction site positions for a project. */
 export async function seedProjectPositions(
   supabase: SupabaseClient,
   projectId: string
@@ -112,13 +112,18 @@ export async function seedProjectPositions(
   const { getSeedPositionRows } = await import('@/lib/i18n/position-labels')
   const rows = getSeedPositionRows(projectId)
 
-  const { error } = await supabase.from('positions').insert(rows)
-
-  if (error && !error.message.includes('duplicate') && !error.message.includes('unique')) {
-    const fallbackRows = rows.map(({ name_en, name_fa, name_fr, name_de, ...rest }) => rest)
-    const { error: fallbackError } = await supabase.from('positions').insert(fallbackRows)
-    if (fallbackError && !fallbackError.message.includes('duplicate') && !fallbackError.message.includes('unique')) {
-      throw new Error(fallbackError.message)
+  for (const row of rows) {
+    const { error } = await supabase.from('positions').upsert(row, {
+      onConflict: 'project_id,key',
+      ignoreDuplicates: true,
+    })
+    if (error) {
+      const { name_en, name_fa, name_fr, name_de, ...fallback } = row
+      const { error: fallbackError } = await supabase.from('positions').upsert(fallback, {
+        onConflict: 'project_id,key',
+        ignoreDuplicates: true,
+      })
+      if (fallbackError) throw new Error(fallbackError.message)
     }
   }
 

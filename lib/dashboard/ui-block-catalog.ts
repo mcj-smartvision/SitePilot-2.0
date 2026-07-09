@@ -114,6 +114,8 @@ export const UI_BLOCK_CATALOG: UiBlockDefinition[] = [
   { code: 'ACC-PNL-01', key: 'acc.panel.alerts', kind: 'panel', dashboard: 'accountant', layer: 'operational', titleFa: 'هشدارهای مالی', titleEn: 'Financial Alerts', descriptionFa: 'Approved بدون پرداخت، UnderReview طولانی', sortOrder: 840, defaultVisible: true },
   { code: 'ACC-PNL-02', key: 'acc.panel.engineering_link', kind: 'panel', dashboard: 'accountant', layer: 'analytical', titleFa: 'پیشرفت مهندسی', titleEn: 'Engineering Progress', descriptionFa: 'لینک سبک به project_progress_cost', sortOrder: 841, defaultVisible: true },
   { code: 'ACC-ACT-01', key: 'acc.action.add_cost', kind: 'action', dashboard: 'accountant', layer: 'operational', titleFa: 'ثبت هزینه', titleEn: 'Add Cost', descriptionFa: 'فرم افزودن رکورد financial_costs', sortOrder: 850, defaultVisible: true },
+  { code: 'ACC-ACT-02', key: 'acc.action.add_invoice', kind: 'action', dashboard: 'accountant', layer: 'operational', titleFa: 'ثبت صورت‌وضعیت', titleEn: 'Add Invoice', descriptionFa: 'فرم ثبت صورت‌وضعیت کارفرما', sortOrder: 851, defaultVisible: true },
+  { code: 'ACC-TBL-03', key: 'acc.table.vendor_bills', kind: 'table', dashboard: 'accountant', layer: 'operational', titleFa: 'بدهی‌ها و ارزش انبار', titleEn: 'Vendor Bills & Stock', descriptionFa: 'vendor_bills و ارزش ریالی انبار', sortOrder: 822, defaultVisible: true },
 
   // ─── REQ: Cross-cutting request / approval types ───
   { code: 'REQ-001', key: 'req.purchase_request', kind: 'request', dashboard: 'cross', layer: 'operational', titleFa: 'درخواست خرید', titleEn: 'Purchase Request', descriptionFa: 'SS → PM → PR', sortOrder: 801, defaultVisible: true },

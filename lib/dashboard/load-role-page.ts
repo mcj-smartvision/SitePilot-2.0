@@ -20,13 +20,20 @@ export async function loadRolePageData(
 
   let projectOptions = context.projects.map((p) => ({ id: p.project.id, name: p.project.name }))
 
-  if (projectOptions.length === 0 && context.isSystemAdmin) {
+  // System admin / finance_admin can switch any active project (header switcher lists all).
+  // Without this, cookie changes to a non-membership project are ignored and the table never updates.
+  const canSeeAllProjects =
+    context.isSystemAdmin || context.positionKeys.includes('finance_admin')
+
+  if (canSeeAllProjects) {
     const { data } = await supabase
       .from('projects')
       .select('id, name')
       .eq('is_active', true)
       .order('name')
-    projectOptions = (data ?? []) as { id: string; name: string }[]
+    if (data?.length) {
+      projectOptions = data as { id: string; name: string }[]
+    }
   }
 
   const cookieProjectId = cookies().get(PROJECT_COOKIE)?.value ?? null

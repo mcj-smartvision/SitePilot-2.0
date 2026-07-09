@@ -50,7 +50,7 @@ export default function ResetPasswordPage() {
         .eq('user_id', user.id)
     }
 
-    router.push('/reports')
+    router.push('/dashboard')
     router.refresh()
   }
 

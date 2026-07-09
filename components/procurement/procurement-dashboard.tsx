@@ -25,7 +25,7 @@ import type { DashboardUserContext } from '@/types/dashboard'
 import { loadProcurementDashboard, updateProcurementStatus } from '@/utils/procurement/dashboard'
 import { cn } from '@/lib/utils'
 import {
-  AdminUiBlockCatalogPanel,
+  UiBlockCustomizePanel,
   UiBlockGuard,
   UiBlockVisibilityProvider,
 } from '@/components/dashboard/ui-block-visibility'
@@ -136,9 +136,11 @@ export function ProcurementDashboard({
     <UiBlockVisibilityProvider
       visibleCodes={visibleBlockCodes}
       showAdminBlockCodes={initialContext.isSystemAdmin}
+      dashboard="procurement"
+      projectId={projectId}
     >
     <div className={cn('space-y-8', isRtl && 'text-right')}>
-      <AdminUiBlockCatalogPanel dashboard="procurement" />
+      <UiBlockCustomizePanel />
 
       <PageHeader
         title={t.title}

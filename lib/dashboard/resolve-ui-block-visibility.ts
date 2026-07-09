@@ -60,10 +60,16 @@ export async function fetchActiveUiBlocks(
   const { data, error } = await query
   if (error) throw new Error(error.message)
 
-  if (data?.length) return data as DashboardUiBlock[]
+  const catalogFallback = dashboard ? getBlocksForDashboard(dashboard).map(catalogToBlock) : UI_BLOCK_CATALOG.map(catalogToBlock)
 
-  const fallback = dashboard ? getBlocksForDashboard(dashboard) : UI_BLOCK_CATALOG
-  return fallback.map(catalogToBlock)
+  if (data?.length) {
+    const byCode = new Map<string, DashboardUiBlock>()
+    for (const block of catalogFallback) byCode.set(block.code, block)
+    for (const block of data as DashboardUiBlock[]) byCode.set(block.code, block)
+    return [...byCode.values()].sort((a, b) => a.sort_order - b.sort_order)
+  }
+
+  return catalogFallback
 }
 
 export async function fetchPositionUiBlockVisibility(
@@ -125,7 +131,13 @@ export async function resolveVisibleUiBlockCodes(
   const { dashboard, showAll = false } = options
 
   const blocks = await fetchActiveUiBlocks(supabase, dashboard)
-  if (showAll) return new Set(blocks.map((b) => b.code))
+  if (showAll) {
+    const catalogBlocks = dashboard ? getBlocksForDashboard(dashboard) : UI_BLOCK_CATALOG
+    const codes = new Set<string>()
+    for (const block of blocks) codes.add(block.code)
+    for (const block of catalogBlocks) codes.add(block.code)
+    return codes
+  }
 
   if (positionIds.length === 0) {
     return new Set(blocks.filter((b) => b.default_visible).map((b) => b.code))

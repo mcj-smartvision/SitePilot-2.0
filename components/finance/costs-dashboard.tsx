@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { FormattedDate } from '@/components/schedule/formatted-date'
+import { MoneyInput, parseMoneyInput } from '@/components/finance/money-input'
 import { useSupabase } from '@/hooks/useSupabase'
 import {
   FINANCIAL_COST_TYPES,
@@ -102,7 +103,7 @@ export function CostsDashboard({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!projectId || !canEdit) return
-    const amount = Number(formAmount)
+    const amount = parseMoneyInput(formAmount)
     if (!Number.isFinite(amount) || amount <= 0) {
       setError('Amount must be greater than zero.')
       return
@@ -269,14 +270,7 @@ export function CostsDashboard({
               </div>
               <div className="space-y-2">
                 <Label>Amount</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  required
-                  value={formAmount}
-                  onChange={(e) => setFormAmount(e.target.value)}
-                />
+                <MoneyInput value={formAmount} onChange={setFormAmount} required />
               </div>
               <div className="space-y-2">
                 <Label>Item code</Label>

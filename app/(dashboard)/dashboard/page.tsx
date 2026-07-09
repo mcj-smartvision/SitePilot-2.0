@@ -18,6 +18,8 @@ export default async function DashboardPage() {
 
   if (postLogin === '/first-login') redirect('/first-login')
   if (postLogin === '/admin' && context.projects.length === 0) redirect('/admin')
+  // Role users land on their own dashboard, not the generic hub
+  if (postLogin !== '/dashboard') redirect(postLogin)
 
   const visibleBlockCodes = await loadUiBlockVisibility(
     supabase,

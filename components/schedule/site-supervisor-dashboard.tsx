@@ -53,7 +53,7 @@ import {
 } from '@/utils/supervisor/dashboard'
 import { cn } from '@/lib/utils'
 import {
-  AdminUiBlockCatalogPanel,
+  UiBlockCustomizePanel,
   UiBlockGuard,
   UiBlockVisibilityProvider,
 } from '@/components/dashboard/ui-block-visibility'
@@ -223,9 +223,11 @@ export function SiteSupervisorDashboard({
     <UiBlockVisibilityProvider
       visibleCodes={visibleBlockCodes}
       showAdminBlockCodes={initialContext.isSystemAdmin}
+      dashboard="site-supervisor"
+      projectId={projectId}
     >
       <div className={cn('space-y-8', isRtl && 'text-right')}>
-        <AdminUiBlockCatalogPanel dashboard="site-supervisor" />
+        <UiBlockCustomizePanel />
 
       <PageHeader
         title={t.title}

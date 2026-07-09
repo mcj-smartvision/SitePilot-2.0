@@ -55,7 +55,7 @@ import {
 } from '@/utils/qc/dashboard'
 import { cn } from '@/lib/utils'
 import {
-  AdminUiBlockCatalogPanel,
+  UiBlockCustomizePanel,
   UiBlockGuard,
   UiBlockVisibilityProvider,
 } from '@/components/dashboard/ui-block-visibility'
@@ -219,9 +219,11 @@ export function QcDashboard({
     <UiBlockVisibilityProvider
       visibleCodes={visibleBlockCodes}
       showAdminBlockCodes={initialContext.isSystemAdmin}
+      dashboard="qc"
+      projectId={projectId}
     >
     <div className="space-y-6" dir={dir}>
-      <AdminUiBlockCatalogPanel dashboard="qc" />
+      <UiBlockCustomizePanel />
 
       <PageHeader
         title={t.title}

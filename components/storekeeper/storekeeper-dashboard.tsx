@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import {
-  AdminUiBlockCatalogPanel,
+  UiBlockCustomizePanel,
   UiBlockGuard,
   UiBlockVisibilityProvider,
 } from '@/components/dashboard/ui-block-visibility'
@@ -323,9 +323,11 @@ export function StorekeeperDashboard({
     <UiBlockVisibilityProvider
       visibleCodes={visibleBlockCodes}
       showAdminBlockCodes={context.isSystemAdmin}
+      dashboard="storekeeper"
+      projectId={projectId}
     >
     <div className={cn('space-y-8', isRtl && 'text-right')} dir={dir}>
-      <AdminUiBlockCatalogPanel dashboard="storekeeper" />
+      <UiBlockCustomizePanel />
 
       <PageHeader
         title={t.title}

@@ -1,11 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DashboardUserContext } from '@/types/dashboard'
 import {
+  fetchMemberUiBlockPreferences,
+  mergeMemberUiBlockPreferences,
+} from '@/lib/dashboard/member-ui-block-preferences'
+import {
   getPositionIdsForProject,
   resolveVisibleUiBlockCodes,
 } from '@/lib/dashboard/resolve-ui-block-visibility'
 
-/** Server-side loader for role dashboard UI block visibility. */
+/** Server-side loader for role dashboard UI block visibility (role + personal prefs). */
 export async function loadUiBlockVisibility(
   supabase: SupabaseClient,
   context: DashboardUserContext,
@@ -13,9 +17,20 @@ export async function loadUiBlockVisibility(
   dashboard: string
 ): Promise<string[]> {
   const positionIds = getPositionIdsForProject(context.projects, activeProjectId)
-  const visible = await resolveVisibleUiBlockCodes(supabase, positionIds, {
+  const base = await resolveVisibleUiBlockCodes(supabase, positionIds, {
     dashboard,
     showAll: context.isSystemAdmin,
   })
-  return [...visible]
+
+  if (!activeProjectId) return [...base]
+
+  const preferences = await fetchMemberUiBlockPreferences(
+    supabase,
+    context.userId,
+    activeProjectId,
+    dashboard
+  )
+
+  const merged = mergeMemberUiBlockPreferences(base, preferences, dashboard)
+  return [...merged]
 }

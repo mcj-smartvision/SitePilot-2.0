@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { UI_BLOCK_BY_CODE } from '@/lib/dashboard/ui-block-catalog'
 import {
-  AdminUiBlockCatalogPanel,
+  UiBlockCustomizePanel,
   UiBlockGuard,
   UiBlockVisibilityProvider,
 } from '@/components/dashboard/ui-block-visibility'
@@ -17,6 +17,7 @@ interface PlaceholderRoleDashboardProps {
   description: string
   roleLabel: string
   dashboard: string
+  projectId?: string | null
   blockCodes?: string[]
   visibleBlockCodes?: string[]
   showAdminBlockCodes?: boolean
@@ -28,6 +29,7 @@ export function PlaceholderRoleDashboard({
   description,
   roleLabel,
   dashboard,
+  projectId = null,
   blockCodes = [],
   visibleBlockCodes = [],
   showAdminBlockCodes = false,
@@ -37,9 +39,11 @@ export function PlaceholderRoleDashboard({
     <UiBlockVisibilityProvider
       visibleCodes={visibleBlockCodes}
       showAdminBlockCodes={showAdminBlockCodes}
+      dashboard={dashboard}
+      projectId={projectId}
     >
       <div className="space-y-6 max-w-4xl">
-        <AdminUiBlockCatalogPanel dashboard={dashboard} />
+        <UiBlockCustomizePanel />
 
         <PageHeader title={title} description={description} />
 

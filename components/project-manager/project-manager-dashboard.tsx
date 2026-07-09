@@ -9,7 +9,7 @@ import { AiDraftViewer } from '@/components/shared/ai-draft-viewer'
 import { ModalOverlay } from '@/components/shared/modal-overlay'
 import { PmAnalyticsControlRoom } from '@/components/project-manager/pm-analytics-control-room'
 import { ApprovalCenter, DepartmentOverviewGrid, ActivityFeedPanel } from '@/components/project-manager/pm-sections'
-import { UiBlockGuard, UiBlockVisibilityProvider, AdminUiBlockCatalogPanel } from '@/components/dashboard/ui-block-visibility'
+import { UiBlockGuard, UiBlockVisibilityProvider, UiBlockCustomizePanel } from '@/components/dashboard/ui-block-visibility'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -163,9 +163,11 @@ export function ProjectManagerDashboard({
     <UiBlockVisibilityProvider
       visibleCodes={visibleBlockCodes}
       showAdminBlockCodes={initialContext.isSystemAdmin}
+      dashboard="project-manager"
+      projectId={projectId}
     >
       <div className={cn('space-y-8', isRtl && 'text-right')}>
-        <AdminUiBlockCatalogPanel dashboard="project-manager" />
+        <UiBlockCustomizePanel />
 
         <PmAnalyticsControlRoom
           projectName={projectName}

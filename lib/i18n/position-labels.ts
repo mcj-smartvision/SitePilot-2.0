@@ -17,6 +17,7 @@ export const POSITION_LABELS: Record<string, Record<LocaleKey, string>> = {
   surveyor: { en: 'Surveyor', fa: 'نقشه‌بردار', fr: 'Géomètre', de: 'Vermessungsingenieur' },
   storekeeper: { en: 'Storekeeper', fa: 'انباردار', fr: 'Magasinier', de: 'Lagerverwalter' },
   procurement_officer: { en: 'Procurement Officer', fa: 'مسئول خرید', fr: 'Acheteur', de: 'Einkaufsbeauftragter' },
+  project_accountant: { en: 'Project Accountant', fa: 'حسابدار پروژه', fr: 'Comptable projet', de: 'Projektbuchhalter' },
   planning_engineer: { en: 'Planning Engineer', fa: 'مهندس برنامه‌ریزی', fr: 'Planificateur', de: 'Planungsingenieur' },
   document_controller: { en: 'Document Controller', fa: 'مسئول مستندات', fr: 'Gestionnaire documentaire', de: 'Dokumentencontroller' },
   foreman: { en: 'Foreman', fa: 'سرکارگر', fr: 'Contremaître', de: 'Vorarbeiter' },

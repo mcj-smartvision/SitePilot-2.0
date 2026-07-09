@@ -2,7 +2,7 @@ import type { DashboardUserContext } from '@/types/dashboard'
 import type { SiteRoleKey } from '@/lib/dashboard/roles'
 
 /** Position keys that grant access to each role dashboard. */
-export const ROLE_DASHBOARD_ACCESS: Record<string, SiteRoleKey[]> = {
+export const ROLE_DASHBOARD_ACCESS: Record<string, (SiteRoleKey | 'finance_admin')[]> = {
   'site-supervisor': ['site_supervisor'],
   'project-manager': ['project_manager'],
   storekeeper: ['storekeeper'],
@@ -10,7 +10,7 @@ export const ROLE_DASHBOARD_ACCESS: Record<string, SiteRoleKey[]> = {
   qc: ['qa_qc_inspector'],
   hse: ['hse_officer'],
   security: ['security'],
-  accountant: ['project_accountant'],
+  accountant: ['project_accountant', 'finance_admin'],
 }
 
 export function hasRoleDashboardAccess(
