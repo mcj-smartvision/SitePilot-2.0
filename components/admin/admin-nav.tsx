@@ -12,6 +12,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { APP_NAME, APP_PRODUCT_LINE } from '@/lib/brand'
 import { LogoutButton } from '@/components/auth/logout-button'
 import { HeaderLanguageSwitcher } from '@/components/i18n/header-language-switcher'
 import { HeaderCalendarSwitcher } from '@/components/schedule/header-calendar-switcher'
@@ -28,26 +29,30 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
   const pathname = usePathname()
 
   return (
-    <div className="flex min-h-[calc(100vh-0px)] bg-muted/30">
-      <aside className="hidden lg:flex w-64 flex-col border-r bg-card shrink-0">
-        <div className="flex h-16 items-center gap-3 border-b px-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0">
+    <div className="flex min-h-screen bg-[#f4f5f7]">
+      <aside className="hidden lg:flex w-[260px] flex-col border-e border-slate-200/80 bg-white shrink-0">
+        <div className="flex h-[72px] items-center gap-3 border-b border-slate-100 px-5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shrink-0">
             <HardHat className="h-5 w-5" />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm leading-tight">SitePilot</p>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Operations</p>
+          <div className="min-w-0">
+            <p className="font-bold text-[15px] leading-tight tracking-tight">{APP_NAME}</p>
+            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{APP_PRODUCT_LINE}</p>
           </div>
-          <HeaderCalendarSwitcher className="shrink-0 hidden xl:block" />
-          <HeaderLanguageSwitcher className="shrink-0" />
         </div>
 
-        <div className="border-b px-3 py-3">
-          <HeaderProjectSwitcher className="[&_button]:w-full" />
+        <div className="space-y-3 border-b border-slate-100 px-4 py-4">
+          <HeaderProjectSwitcher className="[&_button]:w-full [&_button]:justify-between" />
+          <div className="flex items-center gap-2">
+            <HeaderCalendarSwitcher className="shrink-0" />
+            <HeaderLanguageSwitcher className="shrink-0" />
+          </div>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3">
-          <p className="admin-section-title px-3 py-2">Administration</p>
+        <nav className="flex-1 space-y-1 p-3 pt-4">
+          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            Administration
+          </p>
           {NAV_ITEMS.map((item) => {
             const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
             const Icon = item.icon
@@ -56,37 +61,35 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
+                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
                   active
                     ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 )}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon className="h-4 w-4 shrink-0 opacity-90" />
                 {item.label}
-                {active ? <ChevronRight className="h-3.5 w-3.5 ml-auto opacity-70" /> : null}
+                {active ? <ChevronRight className="h-3.5 w-3.5 ms-auto opacity-70" /> : null}
               </Link>
             )
           })}
         </nav>
 
-        <div className="border-t p-4 space-y-3">
+        <div className="border-t border-slate-100 p-4 space-y-3">
           {email ? (
             <p className="text-xs text-muted-foreground truncate px-1" title={email}>
               {email}
             </p>
           ) : null}
-          <div className="flex items-center gap-2">
-            <LogoutButton label="Sign out" className="flex-1" />
-          </div>
+          <LogoutButton label="Sign out" className="w-full" />
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="lg:hidden sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-card/95 backdrop-blur px-4">
+        <header className="lg:hidden sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-white/95 backdrop-blur px-4">
           <div className="flex items-center gap-2">
             <HardHat className="h-5 w-5 text-primary" />
-            <span className="font-bold">SitePilot Admin</span>
+            <span className="font-bold">{APP_NAME}</span>
           </div>
           <div className="flex items-center gap-2">
             <HeaderProjectSwitcher />
@@ -96,7 +99,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
           </div>
         </header>
 
-        <div className="lg:hidden overflow-x-auto border-b bg-card px-2 py-2">
+        <div className="lg:hidden overflow-x-auto border-b bg-white px-2 py-2">
           <nav className="flex gap-1 min-w-max">
             {NAV_ITEMS.map((item) => {
               const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
@@ -105,7 +108,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap',
+                    'rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap',
                     active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
                   )}
                 >
@@ -116,7 +119,9 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
           </nav>
         </div>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">{children}</main>
+        <main className="flex-1 px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10 overflow-auto">
+          {children}
+        </main>
       </div>
     </div>
   )
@@ -140,12 +145,12 @@ export function ProjectAdminNav({ projectId, projectName }: ProjectNavProps) {
   ]
 
   return (
-    <div className="rounded-xl border bg-card p-4 space-y-3">
+    <div className="rounded-2xl border bg-white p-5 space-y-4">
       <div>
-        <p className="admin-section-title">Project</p>
-        <h2 className="text-lg font-semibold mt-0.5">{projectName}</h2>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Project</p>
+        <h2 className="text-lg font-semibold mt-1">{projectName}</h2>
       </div>
-      <nav className="flex flex-wrap gap-1">
+      <nav className="flex flex-wrap gap-2">
         {items.map((item) => {
           const active = pathname.startsWith(item.href)
           return (

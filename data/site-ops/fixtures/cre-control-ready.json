@@ -1,0 +1,80 @@
+{
+  "ok": true,
+  "policy_version": "phase1_default_v1",
+  "project_context": {
+    "evaluation_date": "2026-07-18",
+    "unit_system": "metric",
+    "language_ui": "fa"
+  },
+  "summary": {
+    "gate": "CONTROL_READY",
+    "overall_score": 86.4,
+    "blocker_count": 0,
+    "finding_codes": [],
+    "truth_flags": {
+      "status_stale": false,
+      "date_integrity_risk": false,
+      "resource_model_unusable": false,
+      "person_day_not_derivable": false,
+      "no_quantity_basis": false
+    },
+    "stats": {
+      "date_integrity": 90,
+      "status_freshness": 88,
+      "quantity_basis": 85,
+      "resource_usability": 84,
+      "person_day_derivability": 82
+    },
+    "top_remediations": [],
+    "table": {
+      "total_rows": 2,
+      "ready_rows": 2,
+      "partial_rows": 0,
+      "not_ready_rows": 0
+    },
+    "forecast": "OPEN"
+  },
+  "findings": [],
+  "control_ready_table": {
+    "total_rows": 2,
+    "ready_rows": 2,
+    "partial_rows": 0,
+    "not_ready_rows": 0,
+    "rows": [
+      {
+        "task_uid": 101,
+        "wbs": "2.1",
+        "name": "Formwork level +1",
+        "is_summary": false,
+        "location": { "value": "Grid A-C", "state": "VALID" },
+        "quantity": { "value": 120, "state": "VALID" },
+        "quantity_uom": { "value": "m2", "state": "VALID" },
+        "crew_or_resource": { "value": "Carpentry Crew 1", "state": "VALID" },
+        "person_day": { "value": 8, "state": "VALID" },
+        "progress_method": { "value": "quantity", "state": "VALID" },
+        "start": { "value": "2026-07-18", "state": "VALID" },
+        "finish": { "value": "2026-07-22", "state": "VALID" },
+        "percent_complete": { "value": 0, "state": "VALID" },
+        "readiness_row_status": "READY",
+        "blockers": []
+      },
+      {
+        "task_uid": 102,
+        "wbs": "2.2",
+        "name": "Rebar level +1",
+        "is_summary": false,
+        "location": { "value": "Grid A-C", "state": "VALID" },
+        "quantity": { "value": 4.5, "state": "VALID" },
+        "quantity_uom": { "value": "ton", "state": "VALID" },
+        "crew_or_resource": { "value": "Steel Crew 2", "state": "VALID" },
+        "person_day": { "value": 6, "state": "VALID" },
+        "progress_method": { "value": "quantity", "state": "VALID" },
+        "start": { "value": "2026-07-20", "state": "VALID" },
+        "finish": { "value": "2026-07-24", "state": "VALID" },
+        "percent_complete": { "value": 0, "state": "VALID" },
+        "readiness_row_status": "READY",
+        "blockers": []
+      }
+    ]
+  }
+}

@@ -7,8 +7,8 @@ import { isRtlLocale, normalizeLocale } from '@/lib/project-init/i18n/utils'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'SitePilot 2.1',
-  description: 'Construction Site Monitoring System',
+  title: 'Liparta',
+  description: 'Control Readiness & Site Operations',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

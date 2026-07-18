@@ -27,7 +27,7 @@ export async function GET() {
     {
       status: healthy ? 'ok' : 'misconfigured',
       message: healthy
-        ? 'SitePilot API is running.'
+        ? 'Liparta API is running.'
         : 'Supabase configuration problem — Add Member will fail until fixed.',
       env,
       serviceRole: {

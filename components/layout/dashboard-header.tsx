@@ -10,6 +10,7 @@ import { useLocale } from '@/components/i18n/locale-provider'
 import type { RoleNavLink } from '@/lib/dashboard/role-nav'
 import { HardHat } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { APP_NAME } from '@/lib/brand'
 
 interface DashboardHeaderProps {
   email: string
@@ -52,7 +53,7 @@ export function DashboardHeader({ email, isAdmin, roleNavLinks = [] }: Dashboard
             <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <HardHat className="h-4 w-4" />
             </div>
-            <span className="hidden sm:inline">SitePilot</span>
+            <span className="hidden sm:inline">{APP_NAME}</span>
           </Link>
           {navItems.map((item) => {
             const active = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href))

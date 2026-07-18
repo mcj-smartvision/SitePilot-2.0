@@ -11,32 +11,36 @@ const typeIcons = {
 }
 
 const typeColors = {
-  action: 'bg-blue-50 text-blue-700',
+  action: 'bg-sky-50 text-sky-700',
   alert: 'bg-amber-50 text-amber-700',
-  security: 'bg-red-50 text-red-700',
+  security: 'bg-rose-50 text-rose-700',
 }
 
 export function ActivityFeed({ activities }: { activities: AdminActivityItem[] }) {
   return (
-    <div className="space-y-1">
+    <div className="divide-y divide-slate-100">
       {activities.map((item) => {
         const Icon = typeIcons[item.type]
         return (
-          <div
-            key={item.id}
-            className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/50"
-          >
-            <div className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', typeColors[item.type])}>
+          <div key={item.id} className="flex items-start gap-3.5 py-3.5 first:pt-0 last:pb-0">
+            <div
+              className={cn(
+                'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+                typeColors[item.type]
+              )}
+            >
               <Icon className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                <span className="font-medium text-sm">{item.user}</span>
-                <span className="text-xs text-muted-foreground">· {item.role}</span>
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span className="font-medium text-sm text-slate-900">{item.user}</span>
+                <span className="text-xs text-muted-foreground">{item.role}</span>
               </div>
-              <p className="text-sm text-foreground/80 mt-0.5">{item.action}</p>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs rounded-md bg-muted px-1.5 py-0.5 font-medium">{item.section}</span>
+              <p className="text-sm text-slate-600 mt-1 leading-relaxed">{item.action}</p>
+              <div className="flex items-center gap-2.5 mt-2">
+                <span className="text-[11px] rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
+                  {item.section}
+                </span>
                 <span className="text-xs text-muted-foreground">{item.time}</span>
               </div>
             </div>

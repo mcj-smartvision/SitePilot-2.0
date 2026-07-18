@@ -49,5 +49,21 @@ export function getRoleNavLinks(context: DashboardUserContext): RoleNavLink[] {
     })
   }
 
+  // Layer 2 Site Ops — PM / supervisor / admin
+  if (
+    (context.isSystemAdmin ||
+      context.positionKeys.includes('project_manager') ||
+      context.positionKeys.includes('site_supervisor')) &&
+    !seen.has('/site-ops')
+  ) {
+    links.push({
+      href: '/site-ops',
+      label: 'Site Ops',
+      roleKey: context.positionKeys.includes('site_supervisor')
+        ? 'site_supervisor'
+        : 'project_manager',
+    })
+  }
+
   return links
 }

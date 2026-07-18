@@ -13,6 +13,7 @@ import { HardHat, Lock, User, ArrowRight } from 'lucide-react'
 import { normalizeLoginIdentifier } from '@/lib/auth/login-identifier'
 import { HeaderLanguageSwitcher } from '@/components/i18n/header-language-switcher'
 import { HeaderCalendarSwitcher } from '@/components/schedule/header-calendar-switcher'
+import { APP_NAME, APP_TAGLINE } from '@/lib/brand'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -80,9 +81,9 @@ export default function LoginPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground mb-4">
             <HardHat className="h-6 w-6" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">SitePilot</h1>
+          <h1 className="text-xl font-bold tracking-tight">{APP_NAME}</h1>
           <p className="text-xs uppercase tracking-widest text-muted-foreground mt-1">
-            Construction Operations
+            {APP_TAGLINE}
           </p>
         </div>
 

@@ -1,0 +1,117 @@
+{
+  "ok": false,
+  "policy_version": "phase1_default_v1",
+  "project_context": {
+    "evaluation_date": "2026-07-18",
+    "unit_system": "metric",
+    "language_ui": "en"
+  },
+  "summary": {
+    "gate": "NOT_CONTROL_READY",
+    "overall_score": 18.8,
+    "blocker_count": 5,
+    "finding_codes": [
+      "DATE_INTEGRITY_RISK",
+      "INVALID_ASSIGNMENT_RESOURCE",
+      "NO_QUANTITY_BASIS",
+      "PERSON_DAY_NOT_DERIVABLE",
+      "RESOURCE_MODEL_UNUSABLE"
+    ],
+    "truth_flags": {
+      "status_stale": true,
+      "date_integrity_risk": true,
+      "resource_model_unusable": true,
+      "person_day_not_derivable": true,
+      "no_quantity_basis": true
+    },
+    "stats": {
+      "date_integrity": 12,
+      "status_freshness": 20,
+      "quantity_basis": 15,
+      "resource_usability": 10,
+      "person_day_derivability": 8
+    },
+    "top_remediations": [
+      "Replace invalid resource UIDs (e.g. -65535) with named crews",
+      "Add quantity and UOM on production tasks",
+      "Refresh stale status dates before re-running CRE"
+    ],
+    "table": {
+      "total_rows": 3,
+      "ready_rows": 0,
+      "partial_rows": 1,
+      "not_ready_rows": 2
+    },
+    "forecast": "CLOSED"
+  },
+  "findings": [
+    {
+      "code": "INVALID_ASSIGNMENT_RESOURCE",
+      "severity": "blocker",
+      "title": "Invalid resource UID",
+      "remediation": "Map assignments to real named resources"
+    },
+    {
+      "code": "NO_QUANTITY_BASIS",
+      "severity": "blocker",
+      "title": "Missing quantity basis",
+      "remediation": "Provide quantity + UOM on leaf tasks"
+    }
+  ],
+  "control_ready_table": {
+    "total_rows": 3,
+    "ready_rows": 0,
+    "partial_rows": 1,
+    "not_ready_rows": 2,
+    "rows": [
+      {
+        "task_uid": 10,
+        "wbs": "1.1",
+        "name": "Excavate foundation",
+        "is_summary": false,
+        "location": { "value": "Zone A", "state": "VALID" },
+        "quantity": { "value": null, "state": "MISSING" },
+        "quantity_uom": { "value": null, "state": "MISSING" },
+        "crew_or_resource": { "value": -65535, "state": "INVALID", "note": "Invalid resource UID" },
+        "person_day": { "value": null, "state": "UNUSABLE" },
+        "progress_method": { "value": "qty", "state": "VALID" },
+        "start": { "value": "2024-01-01", "state": "VALID" },
+        "finish": { "value": "2024-01-10", "state": "VALID" },
+        "readiness_row_status": "NOT_READY",
+        "blockers": ["NO_QUANTITY_BASIS", "INVALID_ASSIGNMENT_RESOURCE"]
+      },
+      {
+        "task_uid": 11,
+        "wbs": "1.2",
+        "name": "Pour blinding",
+        "is_summary": false,
+        "location": { "value": "Zone A", "state": "VALID" },
+        "quantity": { "value": 40, "state": "VALID" },
+        "quantity_uom": { "value": "m3", "state": "VALID" },
+        "crew_or_resource": { "value": "Crew B", "state": "VALID" },
+        "person_day": { "value": null, "state": "MISSING" },
+        "progress_method": { "value": "qty", "state": "VALID" },
+        "start": { "value": "2024-01-11", "state": "VALID" },
+        "finish": { "value": "2024-01-15", "state": "VALID" },
+        "readiness_row_status": "PARTIAL",
+        "blockers": ["PERSON_DAY_NOT_DERIVABLE"]
+      },
+      {
+        "task_uid": 1,
+        "wbs": "1",
+        "name": "Foundations",
+        "is_summary": true,
+        "location": { "value": null, "state": "MISSING" },
+        "quantity": { "value": null, "state": "MISSING" },
+        "quantity_uom": { "value": null, "state": "MISSING" },
+        "crew_or_resource": { "value": null, "state": "MISSING" },
+        "person_day": { "value": null, "state": "MISSING" },
+        "progress_method": { "value": null, "state": "MISSING" },
+        "start": { "value": "2024-01-01", "state": "VALID" },
+        "finish": { "value": "2024-01-15", "state": "VALID" },
+        "readiness_row_status": "NOT_READY",
+        "blockers": ["RESOURCE_MODEL_UNUSABLE"]
+      }
+    ]
+  }
+}

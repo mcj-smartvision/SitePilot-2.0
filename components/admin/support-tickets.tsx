@@ -28,11 +28,11 @@ const statusLabels = {
 
 export function SupportTicketsPanel({ tickets }: { tickets: AdminSupportTicket[] }) {
   return (
-    <div className="space-y-2">
+    <div className="divide-y divide-slate-100">
       {tickets.map((ticket) => (
         <div
           key={ticket.id}
-          className="rounded-lg border bg-card/50 p-4 transition-colors hover:bg-muted/30 cursor-pointer"
+          className="py-3.5 first:pt-0 last:pb-0 transition-colors cursor-pointer"
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0 flex-1">

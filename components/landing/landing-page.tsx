@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { APP_NAME, APP_TAGLINE, APP_TAGLINE_FA } from '@/lib/brand'
 
 const benefits = [
   {
@@ -41,9 +42,12 @@ export function LandingPage() {
     <div className="min-h-screen bg-background" dir="rtl">
       <header className="border-b bg-card/80 backdrop-blur sticky top-0 z-10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <HardHat className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold tracking-tight">SitePilot</span>
+            <div>
+              <span className="text-xl font-bold tracking-tight block leading-none">{APP_NAME}</span>
+              <span className="text-[11px] text-muted-foreground">{APP_TAGLINE_FA}</span>
+            </div>
           </div>
           <Button asChild variant="outline" size="sm">
             <Link href="/login">ورود</Link>
@@ -56,12 +60,12 @@ export function LandingPage() {
           <div className="absolute inset-0 site-grid-bg opacity-40" />
           <div className="relative mx-auto max-w-6xl px-4 py-16 sm:py-24">
             <div className="max-w-2xl space-y-6">
-              <p className="text-sm font-semibold text-primary">Smart Vision · مدیریت هوشمند کارگاه</p>
+              <p className="text-sm font-semibold text-primary">{APP_TAGLINE}</p>
               <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-tight">
                 مرکز کنترل پروژه‌های ساختمانی
               </h1>
               <p className="text-lg text-muted-foreground leading-relaxed">
-                سلام مجتبی — SitePilot برای مدیران پروژه‌ای طراحی شده که می‌خواهند{' '}
+                سلام مجتبی — {APP_NAME} برای مدیران پروژه‌ای طراحی شده که می‌خواهند{' '}
                 <strong>وضعیت واقعی کارگاه</strong> را ببینند، نه فقط اعداد خام. از تأخیر پنهان تا
                 کمبود نیرو و مصالح — همه در یک داشبورد قابل فهم.
               </p>
@@ -88,8 +92,8 @@ export function LandingPage() {
             <div className="space-y-3">
               <h2 className="text-2xl font-bold">این سیستم چیست؟</h2>
               <p className="text-muted-foreground leading-relaxed max-w-2xl">
-                SitePilot یک پلتفرم تحلیل و مدیریت کارگاه ساختمانی است: زمان‌بندی MSP، گزارش روزانه،
-                انبار، QC، HSE، تدارکات — با لایه مدیریتی که می‌گوید{' '}
+                {APP_NAME} یک پلتفرم آمادگی کنترل و مدیریت کارگاه ساختمانی است: زمان‌بندی MSP، گزارش
+                روزانه، انبار، QC، HSE، تدارکات — با لایه مدیریتی که می‌گوید{' '}
                 <em>الان باید چه کار کنید</em> نه فقط «وضعیت چیست».
               </p>
             </div>
@@ -97,10 +101,13 @@ export function LandingPage() {
         </section>
 
         <section className="mx-auto max-w-6xl px-4 pb-16">
-          <h2 className="text-2xl font-bold mb-8 text-center">چرا SitePilot؟</h2>
+          <h2 className="text-2xl font-bold mb-8 text-center">چرا {APP_NAME}؟</h2>
           <div className="grid gap-6 sm:grid-cols-2">
             {benefits.map((b) => (
-              <div key={b.title} className="rounded-2xl border bg-card p-6 shadow-sm hover:shadow-md transition-shadow">
+              <div
+                key={b.title}
+                className="rounded-2xl border bg-card p-6 shadow-sm hover:shadow-md transition-shadow"
+              >
                 <b.icon className="h-8 w-8 text-primary mb-4" />
                 <h3 className="font-semibold text-lg mb-2">{b.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{b.text}</p>
@@ -124,7 +131,7 @@ export function LandingPage() {
       </main>
 
       <footer className="border-t py-6 text-center text-xs text-muted-foreground">
-        SitePilot 2.1 · Smart Vision Construction Management
+        {APP_NAME} · {APP_TAGLINE}
       </footer>
     </div>
   )

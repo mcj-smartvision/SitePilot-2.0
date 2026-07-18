@@ -1,7 +1,7 @@
 {
   "name": "sitepilot-2.1",
   "version": "2.1.0",
-  "description": "Smart Vision Construction Management System",
+  "description": "Liparta — Control Readiness & Site Operations",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -12,7 +12,8 @@
     "backup": "node scripts/backup.mjs",
     "backup:db": "node scripts/backup.mjs",
     "generate:ui-blocks-sql": "node scripts/generate-ui-blocks-sql.mjs",
-    "generate:financial-seed": "node scripts/generate-financial-test-data.mjs"
+    "generate:financial-seed": "node scripts/generate-financial-test-data.mjs",
+    "test:site-ops": "npx tsx scripts/test-site-ops-domain.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
