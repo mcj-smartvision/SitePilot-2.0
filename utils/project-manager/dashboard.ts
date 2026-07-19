@@ -9,12 +9,37 @@ import type {
   ProjectHealthStatus,
   ProjectManagerDashboardData,
 } from '@/lib/project-manager/types'
-import { aiActionToApprovalItem, dailyReportToApprovalItem } from '@/lib/project-manager/types'
+import {
+  aiActionToApprovalItem,
+  dailyReportToApprovalItem,
+  workshopPackageToApprovalItem,
+} from '@/lib/project-manager/types'
 import { fetchProjectScheduleMeta } from '@/lib/schedule/apply-actual-start'
 import type { AiActionRow } from '@/lib/supervisor/types'
 import type { ProjectAlert, ProjectScheduleSummary, SiteDailyReport } from '@/types/schedule'
 import { fetchAllProjectTasks } from '@/utils/schedule'
 import { fetchInventoryItems } from '@/utils/storekeeper/inventory'
+
+export async function fetchPendingWorkshopApprovalsForPm(
+  supabase: SupabaseClient,
+  projectId: string
+) {
+  const { data, error } = await supabase
+    .from('workshop_packages')
+    .select(
+      'id, name, location, quantity, uom, crew, note, approval_status, pending_change, updated_at, created_at'
+    )
+    .eq('project_id', projectId)
+    .in('approval_status', ['pending_approval', 'change_requested'])
+    .order('updated_at', { ascending: false })
+    .limit(50)
+
+  if (error) {
+    if (error.code === '42P01' || error.code === '42703') return []
+    throw new Error(error.message)
+  }
+  return data ?? []
+}
 
 export async function fetchPendingAiActionsForPm(
   supabase: SupabaseClient,
@@ -192,6 +217,8 @@ export function buildDepartmentSummaries(
   const now = new Date().toISOString()
   const pendingSite = approvals.filter((a) => a.sourceDepartment === 'Site Supervisor').length
 
+  const pendingWorkshop = approvals.filter((a) => a.kind === 'workshop_package').length
+
   return [
     {
       key: 'site_supervisor',
@@ -201,6 +228,15 @@ export function buildDepartmentSummaries(
       lastUpdateAt: now,
       status: pendingSite > 2 ? 'warning' : 'ok',
       href: '/dashboard/site-supervisor',
+    },
+    {
+      key: 'technical_office',
+      name: 'Technical Office',
+      pendingCount: pendingWorkshop,
+      issueCount: 0,
+      lastUpdateAt: now,
+      status: pendingWorkshop > 0 ? 'warning' : 'ok',
+      href: '/site-ops/approvals',
     },
     {
       key: 'storekeeper',
@@ -283,9 +319,10 @@ export async function loadProjectManagerDashboard(
   reports: SiteDailyReport[],
   alerts: ProjectAlert[]
 ): Promise<ProjectManagerDashboardData> {
-  const [aiRows, inventory, tasks, scheduleMeta, hasProgressCost, hasFinancialCosts] =
+  const [aiRows, workshopRows, inventory, tasks, scheduleMeta, hasProgressCost, hasFinancialCosts] =
     await Promise.all([
       fetchPendingAiActionsForPm(supabase, projectId),
+      fetchPendingWorkshopApprovalsForPm(supabase, projectId).catch(() => []),
       fetchInventoryItems(supabase, projectId).catch(() => [] as InventoryItemRow[]),
       fetchAllProjectTasks(supabase, projectId).catch(() => []),
       fetchProjectScheduleMeta(supabase, projectId).catch(() => ({
@@ -303,7 +340,10 @@ export async function loadProjectManagerDashboard(
 
   const aiApprovals = aiRows.map(aiActionToApprovalItem).filter(Boolean) as ApprovalItem[]
   const reportApprovals = reports.map(dailyReportToApprovalItem).filter(Boolean) as ApprovalItem[]
-  const approvals = [...aiApprovals, ...reportApprovals].sort((a, b) =>
+  const workshopApprovals = workshopRows
+    .map(workshopPackageToApprovalItem)
+    .filter(Boolean) as ApprovalItem[]
+  const approvals = [...workshopApprovals, ...aiApprovals, ...reportApprovals].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt)
   )
 

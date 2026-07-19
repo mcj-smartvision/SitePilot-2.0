@@ -1,34 +1,42 @@
-# Liparta
+# Liparta (لیبارتا)
 
 Control Readiness & Site Operations (Next.js + Supabase).  
 *Integrity before Intelligence.*
 
-## Layer 2 architecture & how it depends on CRE
+## Workshop user flow (Layer 2 — primary)
 
-**CRE Phase 1** = readiness gate for schedule control data (external Liparta product).  
-**Layer 2 (Site Ops)** = site operations system for daily execution (hosted in this app).
+Field path (Persian UI, under 60 seconds):
 
-- No daily control plan exists in Phase 1.
-- Layer 2 begins only after readiness (**CONTROL_READY**) or an **audited override**.
-- This repo does **not** contain `pnpm cre:phase1`. Run CRE externally, then import the JSON export into Site Ops.
+1. Open `/site-ops` → lands on **برنامه**
+2. Select a schedule row (from imported MSP — immutable)
+3. **+ زیرمجموعه** (name, qty, UOM; optional location/crew/flag)
+4. **ارسال به امروز** → **امروز** → ثبت عملکرد (done / partial / blocked)
 
-### Operator workflow
-1. Fix schedule findings in MSP/source  
-2. Rerun CRE Phase 1 externally (`pnpm cre:phase1` in the Liparta monorepo)  
-3. Import run JSON in SitePilot → `/site-ops/cre-runs`  
-4. Promote READY tasks (or force-promote with reason)  
-5. Issue daily plan  
-6. Capture actuals (approve/reject)  
-7. Close day & open daily report (`/site-ops/reports/daily`)
+Primary nav: `برنامه` · `امروز` · `پرچم‌ها`  
+Advanced (hidden): CRE runs, old daily plans, Technical Office, Exceptions.
 
-### Local commands
+### Why MSP is immutable
+MSP/`project_tasks` is the baseline snapshot. Workshop children live in `workshop_packages` linked by `project_task_id` — never rewrite source WBS for daily ops.
+
+### How flags replace heavy change-request UX
+Out-of-list or unclear work: still save + optional `flag_for_review`. Appears in **پرچم‌ها** for Technical Office later. Does **not** block actual entry. No VO ceremony in the main path.
+
+### Demo: شمشه‌گیری گچ under WBS 10.1
+1. Run SQL `database/46-workshop-ops-simple.sql`
+2. Ensure vegas (or project) has MSP imported (Admin → Schedule)
+3. Find row WBS `10.1` / name containing گچ و خاک…
+4. Add child: `اجرای شمشه‌گیری گچ` · محل `واحد 201` · `120` · `m2` · گروه `گچ‌کار`
+5. Send to today `30` → actual `25` status `partial`
+
+## CRE Phase 1 (advanced / separate)
+Readiness gate only (`CONTROL_READY` / `NOT_CONTROL_READY`). Not required for workshop entry. Routes under «ابزار پیشرفته».
+
+## SQL order
+`43` → `44` → `45` → **`46-workshop-ops-simple.sql`**
+
+## Commands
 ```bash
 npm run dev
-npx tsx scripts/test-site-ops-domain.ts
+npm run test:workshop
+npm run test:site-ops
 ```
-
-Apply SQL (Supabase SQL Editor, in order):
-- `database/43-internal-messaging.sql` (if not yet applied)
-- `database/44-site-ops-layer2.sql`
-
-Docs: `docs/site-ops/ADR-001-layer2.md`

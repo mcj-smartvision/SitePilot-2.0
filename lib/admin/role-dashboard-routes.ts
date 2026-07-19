@@ -2,6 +2,7 @@
 export const ROLE_DASHBOARD_ROUTES: Record<string, string> = {
   project_manager: '/dashboard/project-manager',
   site_supervisor: '/dashboard/site-supervisor',
+  technical_office: '/dashboard/technical-office',
   storekeeper: '/dashboard/storekeeper',
   procurement_officer: '/dashboard/procurement',
   qa_qc_inspector: '/dashboard/qc',

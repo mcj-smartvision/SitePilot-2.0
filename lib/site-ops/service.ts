@@ -4,10 +4,18 @@ import {
   approveActual,
   assertPermission,
   buildDailyReport,
+  enrichPackageFields,
   generateDailyPlanDraft,
+  isExceptionFlag,
   issueDailyPlan,
   promoteCreRun,
+  setPaymentFlag,
   submitActual,
+  transitionPackageStatus,
+  validateChildRollup,
+  type BlockerType,
+  type PackageStatus,
+  type PaymentFlag,
   type SiteOpsRole,
 } from '@/lib/site-ops-domain'
 import { SiteOpsError } from '@/lib/site-ops-domain/errors'
@@ -569,3 +577,368 @@ export async function listCrews(supabase: SupabaseClient, projectId: string) {
   if (error) throw new SiteOpsError('VALIDATION', error.message)
   return data ?? []
 }
+
+export async function enrichOperationalPackage(
+  supabase: SupabaseClient,
+  packageId: string,
+  body: {
+    category?: string | null
+    locationText?: string | null
+    plannedQty?: number | null
+    uomText?: string | null
+    crewText?: string | null
+    opsStatus?: PackageStatus
+  }
+) {
+  const user = await requireUser(supabase)
+  const { data: pkg, error } = await supabase
+    .from('site_ops_operational_tasks')
+    .select('*')
+    .eq('id', packageId)
+    .maybeSingle()
+  if (error) throw new SiteOpsError('VALIDATION', error.message)
+  if (!pkg) throw new SiteOpsError('NOT_FOUND', 'Package not found')
+
+  await assertProjectAccess(supabase, user.id, pkg.project_id)
+  const roles = await rolesFor(supabase, user.id, pkg.project_id)
+  const fields = enrichPackageFields({ roles, ...body })
+
+  const { data, error: upErr } = await supabase
+    .from('site_ops_operational_tasks')
+    .update({
+      ...fields,
+      enriched_by: user.id,
+      enriched_at: new Date().toISOString(),
+    })
+    .eq('id', packageId)
+    .select('*')
+    .single()
+  if (upErr) throw new SiteOpsError('VALIDATION', upErr.message)
+
+  await writeSiteOpsAudit(supabase, {
+    projectId: pkg.project_id,
+    actorId: user.id,
+    action: 'package.enrich',
+    entityType: 'operational_task',
+    entityId: packageId,
+    payload: fields,
+  })
+  return data
+}
+
+export async function updatePaymentFlag(
+  supabase: SupabaseClient,
+  packageId: string,
+  body: { flag: PaymentFlag; reason?: string | null }
+) {
+  const user = await requireUser(supabase)
+  const { data: pkg, error } = await supabase
+    .from('site_ops_operational_tasks')
+    .select('*')
+    .eq('id', packageId)
+    .maybeSingle()
+  if (error) throw new SiteOpsError('VALIDATION', error.message)
+  if (!pkg) throw new SiteOpsError('NOT_FOUND', 'Package not found')
+
+  await assertProjectAccess(supabase, user.id, pkg.project_id)
+  const roles = await rolesFor(supabase, user.id, pkg.project_id)
+  const fields = setPaymentFlag({
+    roles,
+    flag: body.flag,
+    reason: body.reason,
+    previousFlag: pkg.payment_flag as PaymentFlag,
+  })
+
+  const { data, error: upErr } = await supabase
+    .from('site_ops_operational_tasks')
+    .update({
+      ...fields,
+      payment_flag_owner: user.id,
+      pm_risk_acknowledged: false,
+      pm_acknowledged_by: null,
+      pm_acknowledged_at: null,
+    })
+    .eq('id', packageId)
+    .select('*')
+    .single()
+  if (upErr) throw new SiteOpsError('VALIDATION', upErr.message)
+
+  if (isExceptionFlag(body.flag)) {
+    await supabase.from('site_ops_approvals').insert({
+      project_id: pkg.project_id,
+      entity_type: 'operational_task',
+      entity_id: packageId,
+      requested_by: user.id,
+      approver_role: 'PM',
+      decision: 'PENDING',
+      note: body.reason ?? fields.payment_flag_reason,
+    })
+  }
+
+  await writeSiteOpsAudit(supabase, {
+    projectId: pkg.project_id,
+    actorId: user.id,
+    action: 'package.payment_flag',
+    entityType: 'operational_task',
+    entityId: packageId,
+    payload: fields,
+  })
+  return data
+}
+
+export async function decomposePackage(
+  supabase: SupabaseClient,
+  parentId: string,
+  children: Array<{
+    name: string
+    plannedQty: number
+    uomText?: string | null
+    locationText?: string | null
+    crewText?: string | null
+  }>
+) {
+  const user = await requireUser(supabase)
+  const { data: parent, error } = await supabase
+    .from('site_ops_operational_tasks')
+    .select('*')
+    .eq('id', parentId)
+    .maybeSingle()
+  if (error) throw new SiteOpsError('VALIDATION', error.message)
+  if (!parent) throw new SiteOpsError('NOT_FOUND', 'Parent package not found')
+
+  await assertProjectAccess(supabase, user.id, parent.project_id)
+  const roles = await rolesFor(supabase, user.id, parent.project_id)
+  assertPermission(roles, 'package.decompose')
+
+  const parentQty =
+    parent.planned_qty != null
+      ? Number(parent.planned_qty)
+      : Number(fieldValue(parent.quantity_json) ?? NaN)
+  validateChildRollup({
+    parentPlannedQty: Number.isFinite(parentQty) ? parentQty : null,
+    childrenPlannedQty: children.map((c) => c.plannedQty),
+  })
+
+  const rows = children.map((c, idx) => ({
+    project_id: parent.project_id,
+    cre_run_id: parent.cre_run_id,
+    task_uid: parent.task_uid * 1000 + idx + 1,
+    wbs: parent.wbs ? `${parent.wbs}.${idx + 1}` : String(idx + 1),
+    name: c.name,
+    location_json: parent.location_json,
+    quantity_json: { value: c.plannedQty, state: 'VALID' },
+    uom_json: { value: c.uomText ?? parent.uom_text ?? fieldValue(parent.uom_json), state: 'VALID' },
+    crew_resource_json: { value: c.crewText ?? parent.crew_text, state: 'VALID' },
+    person_day_json: parent.person_day_json,
+    progress_method_json: parent.progress_method_json,
+    start_json: parent.start_json,
+    finish_json: parent.finish_json,
+    readiness_row_status: parent.readiness_row_status,
+    force_promoted: false,
+    is_active: true,
+    parent_id: parent.id,
+    ops_status: 'Ready',
+    planned_qty: c.plannedQty,
+    uom_text: c.uomText ?? parent.uom_text,
+    location_text: c.locationText ?? parent.location_text,
+    crew_text: c.crewText ?? parent.crew_text,
+    category: parent.category,
+    payment_flag: parent.payment_flag,
+    payment_flag_reason: parent.payment_flag_reason,
+    enriched_by: user.id,
+    enriched_at: new Date().toISOString(),
+  }))
+
+  const { data, error: insErr } = await supabase
+    .from('site_ops_operational_tasks')
+    .insert(rows)
+    .select('*')
+  if (insErr) throw new SiteOpsError('VALIDATION', insErr.message)
+
+  await writeSiteOpsAudit(supabase, {
+    projectId: parent.project_id,
+    actorId: user.id,
+    action: 'package.decompose',
+    entityType: 'operational_task',
+    entityId: parentId,
+    payload: { childCount: data?.length ?? 0 },
+  })
+  return data ?? []
+}
+
+export async function setPackageStatus(
+  supabase: SupabaseClient,
+  packageId: string,
+  nextStatus: PackageStatus
+) {
+  const user = await requireUser(supabase)
+  const { data: pkg, error } = await supabase
+    .from('site_ops_operational_tasks')
+    .select('*')
+    .eq('id', packageId)
+    .maybeSingle()
+  if (error) throw new SiteOpsError('VALIDATION', error.message)
+  if (!pkg) throw new SiteOpsError('NOT_FOUND', 'Package not found')
+
+  await assertProjectAccess(supabase, user.id, pkg.project_id)
+  const roles = await rolesFor(supabase, user.id, pkg.project_id)
+  const next = transitionPackageStatus({
+    roles,
+    from: (pkg.ops_status as PackageStatus) ?? 'Draft',
+    to: nextStatus,
+    paymentFlag: (pkg.payment_flag as PaymentFlag) ?? 'NotForPayment',
+    pmRiskAcknowledged: Boolean(pkg.pm_risk_acknowledged),
+  })
+
+  const { data, error: upErr } = await supabase
+    .from('site_ops_operational_tasks')
+    .update(next)
+    .eq('id', packageId)
+    .select('*')
+    .single()
+  if (upErr) throw new SiteOpsError('VALIDATION', upErr.message)
+
+  await writeSiteOpsAudit(supabase, {
+    projectId: pkg.project_id,
+    actorId: user.id,
+    action: 'package.status',
+    entityType: 'operational_task',
+    entityId: packageId,
+    payload: next,
+  })
+  return data
+}
+
+export async function createBlocker(
+  supabase: SupabaseClient,
+  body: {
+    projectId: string
+    packageId: string
+    planDate?: string | null
+    blockerType?: BlockerType
+    note: string
+  }
+) {
+  const user = await requireUser(supabase)
+  await assertProjectAccess(supabase, user.id, body.projectId)
+  const roles = await rolesFor(supabase, user.id, body.projectId)
+  assertPermission(roles, 'blocker.write')
+
+  const { data, error } = await supabase
+    .from('site_ops_blockers')
+    .insert({
+      project_id: body.projectId,
+      operational_task_id: body.packageId,
+      plan_date: body.planDate ?? null,
+      blocker_type: body.blockerType ?? 'other',
+      note: body.note.trim(),
+      is_open: true,
+      created_by: user.id,
+    })
+    .select('*')
+    .single()
+  if (error) throw new SiteOpsError('VALIDATION', error.message)
+
+  await supabase
+    .from('site_ops_operational_tasks')
+    .update({ ops_status: 'Blocked' })
+    .eq('id', body.packageId)
+
+  await writeSiteOpsAudit(supabase, {
+    projectId: body.projectId,
+    actorId: user.id,
+    action: 'blocker.write',
+    entityType: 'blocker',
+    entityId: data.id,
+    payload: { packageId: body.packageId, type: body.blockerType ?? 'other' },
+  })
+  return data
+}
+
+export async function listExceptions(supabase: SupabaseClient, projectId: string) {
+  const user = await requireUser(supabase)
+  await assertProjectAccess(supabase, user.id, projectId)
+  const roles = await rolesFor(supabase, user.id, projectId)
+  assertPermission(roles, 'exception.view')
+
+  const { data: flagged } = await supabase
+    .from('site_ops_operational_tasks')
+    .select('*')
+    .eq('project_id', projectId)
+    .eq('is_active', true)
+    .in('payment_flag', ['QuantityIncomplete', 'NeedsChangeReview'])
+    .order('created_at', { ascending: false })
+
+  const { data: pending } = await supabase
+    .from('site_ops_approvals')
+    .select('*')
+    .eq('project_id', projectId)
+    .eq('decision', 'PENDING')
+    .order('created_at', { ascending: false })
+
+  const { data: openBlockers } = await supabase
+    .from('site_ops_blockers')
+    .select('*, site_ops_operational_tasks(name, task_uid)')
+    .eq('project_id', projectId)
+    .eq('is_open', true)
+    .order('created_at', { ascending: false })
+
+  return {
+    paymentRiskPackages: flagged ?? [],
+    pendingApprovals: pending ?? [],
+    openBlockers: openBlockers ?? [],
+  }
+}
+
+export async function acknowledgeException(
+  supabase: SupabaseClient,
+  packageId: string,
+  note?: string
+) {
+  const user = await requireUser(supabase)
+  const { data: pkg, error } = await supabase
+    .from('site_ops_operational_tasks')
+    .select('*')
+    .eq('id', packageId)
+    .maybeSingle()
+  if (error) throw new SiteOpsError('VALIDATION', error.message)
+  if (!pkg) throw new SiteOpsError('NOT_FOUND', 'Package not found')
+
+  await assertProjectAccess(supabase, user.id, pkg.project_id)
+  const roles = await rolesFor(supabase, user.id, pkg.project_id)
+  assertPermission(roles, 'exception.acknowledge')
+
+  const { data, error: upErr } = await supabase
+    .from('site_ops_operational_tasks')
+    .update({
+      pm_risk_acknowledged: true,
+      pm_acknowledged_by: user.id,
+      pm_acknowledged_at: new Date().toISOString(),
+    })
+    .eq('id', packageId)
+    .select('*')
+    .single()
+  if (upErr) throw new SiteOpsError('VALIDATION', upErr.message)
+
+  await supabase
+    .from('site_ops_approvals')
+    .update({
+      decision: 'ACKNOWLEDGED',
+      decided_by: user.id,
+      decided_at: new Date().toISOString(),
+      note: note ?? null,
+    })
+    .eq('entity_id', packageId)
+    .eq('decision', 'PENDING')
+
+  await writeSiteOpsAudit(supabase, {
+    projectId: pkg.project_id,
+    actorId: user.id,
+    action: 'exception.acknowledge',
+    entityType: 'operational_task',
+    entityId: packageId,
+    payload: { note: note ?? null },
+  })
+  return data
+}
+

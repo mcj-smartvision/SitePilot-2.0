@@ -13,7 +13,8 @@
     "backup:db": "node scripts/backup.mjs",
     "generate:ui-blocks-sql": "node scripts/generate-ui-blocks-sql.mjs",
     "generate:financial-seed": "node scripts/generate-financial-test-data.mjs",
-    "test:site-ops": "npx tsx scripts/test-site-ops-domain.ts"
+    "test:site-ops": "npx tsx scripts/test-site-ops-domain.ts",
+    "test:workshop": "npx tsx scripts/test-workshop-domain.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

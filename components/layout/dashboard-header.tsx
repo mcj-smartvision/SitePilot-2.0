@@ -6,6 +6,7 @@ import { LogoutButton } from '@/components/auth/logout-button'
 import { HeaderLanguageSwitcher } from '@/components/i18n/header-language-switcher'
 import { HeaderCalendarSwitcher } from '@/components/schedule/header-calendar-switcher'
 import { HeaderProjectSwitcher } from '@/components/project/header-project-switcher'
+import { MessengerButton } from '@/components/messaging/messenger-panel'
 import { useLocale } from '@/components/i18n/locale-provider'
 import type { RoleNavLink } from '@/lib/dashboard/role-nav'
 import { HardHat } from 'lucide-react'
@@ -75,6 +76,7 @@ export function DashboardHeader({ email, isAdmin, roleNavLinks = [] }: Dashboard
         </nav>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <MessengerButton />
           <HeaderProjectSwitcher className="hidden sm:block" />
           <HeaderCalendarSwitcher />
           <HeaderLanguageSwitcher />

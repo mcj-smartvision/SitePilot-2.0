@@ -11,6 +11,13 @@ export const CONSTRUCTION_ROLES: ConstructionRole[] = [
   { key: 'project_manager', title: 'Project Manager', description: 'Overall project planning, coordination, and delivery.', color: 'bg-slate-700', icon: 'Briefcase' },
   { key: 'site_manager', title: 'Site Manager', description: 'Daily site leadership, workforce, and field coordination.', color: 'bg-stone-700', icon: 'Building2' },
   { key: 'site_supervisor', title: 'Site Supervisor', description: 'Supervises daily operations and progress on site.', color: 'bg-zinc-600', icon: 'HardHat' },
+  {
+    key: 'technical_office',
+    title: 'Technical Office Manager',
+    description: 'Quantity enrichment, near-term decomposition, and payment-readiness flags (Layer 2).',
+    color: 'bg-blue-900',
+    icon: 'Ruler',
+  },
   { key: 'civil_engineer', title: 'Civil Engineer', description: 'Structural and civil works oversight.', color: 'bg-blue-800', icon: 'Ruler' },
   { key: 'architect', title: 'Architect', description: 'Design compliance and architectural coordination.', color: 'bg-indigo-700', icon: 'PenTool' },
   { key: 'structural_engineer', title: 'Structural Engineer', description: 'Structural design review and field conformance.', color: 'bg-sky-800', icon: 'Layers' },
@@ -87,6 +94,19 @@ export const ROLE_DASHBOARD_PREVIEWS: RoleDashboardPreview[] = [
       { label: 'AI drafts', value: '2 pending', trend: 'warning' },
     ],
     alerts: ['Formwork delay — Level 2', 'Purchase request awaiting approval'],
+  },
+  {
+    key: 'technical_office',
+    title: 'Technical Office Manager',
+    color: 'border-l-blue-900',
+    summary: 'Quantity enrichment, payment flags, and exception prep for PM',
+    metrics: [
+      { label: 'Packages to enrich', value: '6', trend: 'warning' },
+      { label: 'Payment risk flags', value: '2', trend: 'warning' },
+      { label: 'Near-term decompose', value: '1 open', trend: 'neutral' },
+      { label: 'CRE bridge', value: 'Ready rows only', trend: 'up' },
+    ],
+    alerts: ['Street-light poles — missing cabling (NeedsChangeReview)'],
   },
   {
     key: 'hse_officer',

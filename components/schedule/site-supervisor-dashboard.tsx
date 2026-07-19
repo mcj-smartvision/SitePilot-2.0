@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Bot, Loader2 } from 'lucide-react'
 import { useLocale } from '@/components/i18n/locale-provider'
 import { PageHeader, LoadingBlock, ErrorBlock, SectionCard, EmptyState } from '@/components/admin/shared'
@@ -280,6 +281,33 @@ export function SiteSupervisorDashboard({
       />
 
       <ScheduleDateToolbar />
+
+      {projectId ? (
+        <div className="rounded-xl border border-sky-200 bg-sky-50/80 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1 text-sm">
+            <p className="font-medium text-sky-950">
+              {isRtl ? 'لیست‌های دفتر فنی و وضعیت تأیید مدیر پروژه' : 'Technical Office lists & PM approval status'}
+            </p>
+            <p className="text-sky-900/80 mt-0.5 text-xs">
+              {isRtl
+                ? 'ببینید دفتر فنی چه نوشته، مدیر تأیید کرده یا نه، و کامنت بگذارید.'
+                : 'See TO items, PM approval status, and leave comments.'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" asChild>
+              <Link href={`/site-ops/prepared?projectId=${projectId}&as=supervisor`}>
+                {isRtl ? 'لیست‌های کارگاه' : 'Workshop lists'}
+              </Link>
+            </Button>
+            <Button type="button" size="sm" variant="outline" asChild>
+              <Link href={`/site-ops/schedule?projectId=${projectId}&as=supervisor`}>
+                {isRtl ? 'مشاهده برنامه (فقط خواندنی)' : 'View schedule (read-only)'}
+              </Link>
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {loading && tasks.length === 0 ? <LoadingBlock label={t.saving} /> : null}
       {error ? <ErrorBlock message={error} onRetry={() => void loadData()} /> : null}

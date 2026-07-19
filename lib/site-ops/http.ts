@@ -16,7 +16,9 @@ export function siteOpsErrorResponse(error: unknown) {
               error.code === 'NO_PROMOTED_TASKS' ||
               error.code === 'CREW_REQUIRED' ||
               error.code === 'VALIDATION' ||
-              error.code === 'PERMIT_REQUIRED'
+              error.code === 'PERMIT_REQUIRED' ||
+              error.code === 'PAYMENT_RISK' ||
+              error.code === 'ROLLUP_MISMATCH'
             ? 409
             : 400
     return NextResponse.json(

@@ -10,6 +10,8 @@ export type SiteOpsErrorCode =
   | 'OVERRIDE_REASON_REQUIRED'
   | 'NO_PROMOTED_TASKS'
   | 'CREW_REQUIRED'
+  | 'PAYMENT_RISK'
+  | 'ROLLUP_MISMATCH'
 
 export class SiteOpsError extends Error {
   readonly code: SiteOpsErrorCode

@@ -5,6 +5,7 @@ import type { SiteRoleKey } from '@/lib/dashboard/roles'
 export const ROLE_DASHBOARD_ACCESS: Record<string, (SiteRoleKey | 'finance_admin')[]> = {
   'site-supervisor': ['site_supervisor'],
   'project-manager': ['project_manager'],
+  'technical-office': ['technical_office'],
   storekeeper: ['storekeeper'],
   procurement: ['procurement_officer'],
   qc: ['qa_qc_inspector'],

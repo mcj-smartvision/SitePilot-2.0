@@ -12,6 +12,8 @@ export type ApprovalItemType =
   | 'schedule_change'
   | 'resource_escalation'
   | 'daily_report'
+  | 'workshop_package'
+  | 'workshop_change'
 
 export interface ProjectHealthStatus {
   plannedProgress: number
@@ -28,7 +30,7 @@ export interface ProjectHealthStatus {
 
 export interface ApprovalItem {
   id: string
-  kind: 'ai_action' | 'daily_report'
+  kind: 'ai_action' | 'daily_report' | 'workshop_package'
   type: ApprovalItemType
   sourceDepartment: string
   title: string
@@ -138,5 +140,52 @@ export function dailyReportToApprovalItem(report: SiteDailyReport): ApprovalItem
     status: 'pending_pm',
     aiGeneratedText: report.summary_text ?? report.ai_parsed?.summary ?? report.raw_text,
     createdAt: report.created_at,
+  }
+}
+
+export function workshopPackageToApprovalItem(row: {
+  id: string
+  name: string
+  location: string | null
+  quantity: number | string
+  uom: string
+  crew: string | null
+  note: string | null
+  approval_status: string
+  pending_change: Record<string, unknown> | null
+  updated_at: string
+  created_at?: string
+}): ApprovalItem | null {
+  if (row.approval_status !== 'pending_approval' && row.approval_status !== 'change_requested') {
+    return null
+  }
+
+  const isChange = row.approval_status === 'change_requested'
+  const qty = `${row.quantity} ${row.uom}`
+  const loc = row.location?.trim() || '—'
+  const crew = row.crew?.trim()
+  const description = [loc, qty, crew].filter(Boolean).join(' · ')
+
+  return {
+    id: row.id,
+    kind: 'workshop_package',
+    type: isChange ? 'workshop_change' : 'workshop_package',
+    sourceDepartment: 'Technical Office',
+    title: isChange ? `درخواست تغییر — ${row.name}` : `کارگاه — ${row.name}`,
+    description,
+    priority: isChange ? 'high' : 'medium',
+    status: 'pending_pm',
+    aiGeneratedText: row.note ?? description,
+    createdAt: row.updated_at || row.created_at || new Date().toISOString(),
+    raw: {
+      name: row.name,
+      location: row.location,
+      quantity: row.quantity,
+      uom: row.uom,
+      crew: row.crew,
+      note: row.note,
+      approval_status: row.approval_status,
+      pending_change: row.pending_change,
+    },
   }
 }

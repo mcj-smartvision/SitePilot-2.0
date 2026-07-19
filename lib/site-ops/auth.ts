@@ -42,7 +42,7 @@ export async function resolveSiteOpsRoles(
 ): Promise<SiteOpsRole[]> {
   const admin = await isSystemAdmin(supabase, userId)
   if (admin) {
-    return ['SITE_MANAGER', 'PROJECT_CONTROLS', 'SUPERVISOR', 'PLANNER']
+    return ['SITE_MANAGER', 'PROJECT_CONTROLS', 'SUPERVISOR', 'PLANNER', 'TECHNICAL_OFFICE', 'PM']
   }
 
   const roles = new Set<SiteOpsRole>(mapSitePilotPositionToSiteOpsRoles(positionKeys))

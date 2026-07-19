@@ -29,6 +29,7 @@ const trendColors = {
 const LIVE_DASHBOARD_ORDER = [
   'project_manager',
   'site_supervisor',
+  'technical_office',
   'project_accountant',
   'storekeeper',
   'procurement_officer',

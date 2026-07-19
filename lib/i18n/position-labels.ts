@@ -8,6 +8,12 @@ export const POSITION_LABELS: Record<string, Record<LocaleKey, string>> = {
   project_manager: { en: 'Project Manager', fa: 'مدیر پروژه', fr: 'Chef de projet', de: 'Projektleiter' },
   site_manager: { en: 'Site Manager', fa: 'مدیر کارگاه', fr: 'Directeur de site', de: 'Bauleiter' },
   site_supervisor: { en: 'Site Supervisor', fa: 'سرپرست کارگاه', fr: 'Superviseur de site', de: 'Bauüberwacher' },
+  technical_office: {
+    en: 'Technical Office Manager',
+    fa: 'مدیر دفتر فنی',
+    fr: 'Bureau technique',
+    de: 'Technisches Büro',
+  },
   civil_engineer: { en: 'Civil Engineer', fa: 'مهندس عمران', fr: 'Ingénieur civil', de: 'Bauingenieur' },
   architect: { en: 'Architect', fa: 'معمار', fr: 'Architecte', de: 'Architekt' },
   structural_engineer: { en: 'Structural Engineer', fa: 'مهندس سازه', fr: 'Ingénieur structure', de: 'Tragwerksplaner' },

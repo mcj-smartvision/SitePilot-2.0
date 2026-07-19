@@ -10,6 +10,7 @@ export interface RoleNavLink {
 const ROLE_DASHBOARD_PATHS: Partial<Record<SiteRoleKey | 'finance_admin', string>> = {
   project_manager: '/dashboard/project-manager',
   site_supervisor: '/dashboard/site-supervisor',
+  technical_office: '/dashboard/technical-office',
   storekeeper: '/dashboard/storekeeper',
   procurement_officer: '/dashboard/procurement',
   qa_qc_inspector: '/dashboard/qc',
@@ -49,19 +50,33 @@ export function getRoleNavLinks(context: DashboardUserContext): RoleNavLink[] {
     })
   }
 
-  // Layer 2 Site Ops — PM / supervisor / admin
+  // Layer 2 Site Ops — PM / supervisor / technical office / admin
   if (
-    (context.isSystemAdmin ||
-      context.positionKeys.includes('project_manager') ||
-      context.positionKeys.includes('site_supervisor')) &&
-    !seen.has('/site-ops')
+    (context.isSystemAdmin || context.positionKeys.includes('project_manager')) &&
+    !seen.has('/site-ops/approvals')
   ) {
     links.push({
-      href: '/site-ops',
-      label: 'Site Ops',
-      roleKey: context.positionKeys.includes('site_supervisor')
-        ? 'site_supervisor'
-        : 'project_manager',
+      href: '/site-ops/approvals',
+      label: 'تأییدات کارگاه',
+      roleKey: 'project_manager',
+    })
+  }
+
+  if (
+    (context.isSystemAdmin ||
+      context.positionKeys.includes('site_supervisor') ||
+      context.positionKeys.includes('technical_office')) &&
+    !seen.has('/site-ops') &&
+    !seen.has('/site-ops/approvals')
+  ) {
+    links.push({
+      href: context.positionKeys.includes('site_supervisor')
+        ? '/site-ops/prepared?as=supervisor'
+        : '/site-ops/schedule',
+      label: context.positionKeys.includes('site_supervisor') ? 'لیست‌های کارگاه' : 'عملیات کارگاه',
+      roleKey: context.positionKeys.includes('technical_office')
+        ? 'technical_office'
+        : 'site_supervisor',
     })
   }
 

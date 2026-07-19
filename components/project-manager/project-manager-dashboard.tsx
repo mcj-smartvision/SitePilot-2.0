@@ -9,6 +9,7 @@ import { AiDraftViewer } from '@/components/shared/ai-draft-viewer'
 import { ModalOverlay } from '@/components/shared/modal-overlay'
 import { PmAnalyticsControlRoom } from '@/components/project-manager/pm-analytics-control-room'
 import { ApprovalCenter, DepartmentOverviewGrid, ActivityFeedPanel } from '@/components/project-manager/pm-sections'
+import { ProposedChangeView } from '@/components/workshop/proposed-change-view'
 import { UiBlockGuard, UiBlockVisibilityProvider, UiBlockCustomizePanel } from '@/components/dashboard/ui-block-visibility'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -157,7 +158,23 @@ export function ProjectManagerDashboard({
     setActionLoading(true)
     setLoadingId(item.id)
     try {
-      if (item.kind === 'ai_action') {
+      if (item.kind === 'workshop_package') {
+        const path =
+          item.type === 'workshop_change'
+            ? `/api/workshop/packages/${item.id}/change-decide`
+            : `/api/workshop/packages/${item.id}/approve`
+        const body =
+          item.type === 'workshop_change'
+            ? { decision: 'approve', comment: rejectReason || editedText || null }
+            : { comment: rejectReason || editedText || null }
+        const res = await fetch(path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || t.loadError)
+      } else if (item.kind === 'ai_action') {
         if (item.type === 'subcontractor_instruction') {
           if (subcontractors.length === 0) {
             throw new Error(
@@ -179,6 +196,7 @@ export function ProjectManagerDashboard({
         await approveDailyReport(supabase, item.id, initialContext.userId)
       }
       setSelected(null)
+      setRejectReason('')
       router.refresh()
       await loadData()
     } catch (err) {
@@ -193,7 +211,23 @@ export function ProjectManagerDashboard({
     setActionLoading(true)
     setLoadingId(item.id)
     try {
-      if (item.kind === 'ai_action') {
+      if (item.kind === 'workshop_package') {
+        const path =
+          item.type === 'workshop_change'
+            ? `/api/workshop/packages/${item.id}/change-decide`
+            : `/api/workshop/packages/${item.id}/reject`
+        const body =
+          item.type === 'workshop_change'
+            ? { decision: 'reject', comment: rejectReason }
+            : { comment: rejectReason }
+        const res = await fetch(path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || t.loadError)
+      } else if (item.kind === 'ai_action') {
         await rejectPmAiAction(supabase, item.id, initialContext.userId, rejectReason || undefined)
       }
       setSelected(null)
@@ -262,6 +296,22 @@ export function ProjectManagerDashboard({
             <PageHeader title={t.approvalCenter} description={t.description} />
             <ScheduleDateToolbar />
 
+            {projectId ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1 text-sm">
+                  <p className="font-medium text-emerald-950">
+                    {isFa ? 'تأییدات عملیات کارگاه (دفتر فنی)' : 'Workshop approvals (Technical Office)'}
+                  </p>
+                  <p className="text-emerald-900/80 mt-0.5">{t.workshopApprovalsHint}</p>
+                </div>
+                <Button type="button" size="sm" asChild>
+                  <Link href={`/site-ops/approvals?projectId=${projectId}`}>
+                    {t.workshopApprovalsLink}
+                  </Link>
+                </Button>
+              </div>
+            ) : null}
+
             {loading && !data ? <LoadingBlock label={t.saving} /> : null}
             {error ? <ErrorBlock message={error} onRetry={() => void loadData()} /> : null}
 
@@ -326,7 +376,9 @@ export function ProjectManagerDashboard({
           <div className="space-y-4">
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs space-y-1">
               <p>
-                <span className="text-muted-foreground">{t.fromSiteSupervisor}</span>
+                <span className="text-muted-foreground">
+                  {selected.kind === 'workshop_package' ? t.fromTechnicalOffice : t.fromSiteSupervisor}
+                </span>
                 {selected.description ? (
                   <>
                     <span className="mx-1.5 text-muted-foreground">·</span>
@@ -335,6 +387,21 @@ export function ProjectManagerDashboard({
                 ) : null}
               </p>
             </div>
+
+            {selected.kind === 'workshop_package' && selected.raw?.pending_change ? (
+              <ProposedChangeView
+                isFa={isFa}
+                current={{
+                  name: selected.raw.name,
+                  location: selected.raw.location,
+                  quantity: selected.raw.quantity,
+                  uom: selected.raw.uom,
+                  crew: selected.raw.crew,
+                  note: selected.raw.note,
+                }}
+                proposed={selected.raw.pending_change as Record<string, unknown>}
+              />
+            ) : null}
 
             {selected.type === 'subcontractor_instruction' ? (
               subcontractors.length === 0 ? (
@@ -378,49 +445,102 @@ export function ProjectManagerDashboard({
               )
             ) : null}
 
-            <AiDraftViewer
-              text={selected.aiGeneratedText ?? selected.description}
-              status="draft_by_ai"
-              labels={{
-                ...pmAiLabelsForItem(t, selected.type, locale),
-                approveSend:
-                  selected.type === 'subcontractor_instruction'
-                    ? subcontractors.length === 0
+            {selected.kind === 'workshop_package' ? (
+              <div className="space-y-3">
+                <div className="rounded-lg border p-3 text-sm space-y-1">
+                  <p className="font-medium">{String(selected.raw?.name ?? selected.title)}</p>
+                  <p className="text-muted-foreground">{selected.description}</p>
+                  {selected.raw?.note ? (
+                    <p className="text-xs text-muted-foreground">
+                      {isFa ? 'یادداشت:' : 'Note:'} {String(selected.raw.note)}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">
+                    {isFa ? 'کامنت مدیر پروژه' : 'PM comment'}
+                    {selected.type === 'workshop_package' || selected.type === 'workshop_change'
                       ? isFa
-                        ? 'ارسال ممکن نیست — پیمانکار نیست'
-                        : 'Cannot send — no subcontractor'
-                      : selectedSubId
-                        ? `${isFa ? 'تأیید و ارسال به' : 'Approve & send to'} ${
-                            subcontractors.find((s) => s.id === selectedSubId)?.name ?? ''
-                          }`
-                        : isFa
-                          ? 'تأیید و ارسال به پیمانکار (انتخاب کنید)'
-                          : 'Approve & send to subcontractor (select)'
-                    : pmAiLabelsForItem(t, selected.type, locale).approveSend,
-              }}
-              forceShowActions
-              loading={actionLoading}
-              onApprove={
-                selected.type === 'subcontractor_instruction' &&
-                (subcontractors.length === 0 || !selectedSubId)
-                  ? undefined
-                  : (text) => handleApproveItem(selected, text)
-              }
-              onReject={() => handleRejectItem(selected)}
-            />
-            {selected.kind === 'ai_action' ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <label className="text-xs text-muted-foreground">{t.rejectionReason}</label>
-                  <VoiceToTextButton
-                    onTranscript={(text) =>
-                      setRejectReason((prev) => (prev ? `${prev} ${text}` : text))
-                    }
+                        ? ' (برای رد الزامی)'
+                        : ' (required to reject)'
+                      : ''}
+                  </label>
+                  <Textarea
+                    rows={2}
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder={isFa ? 'توضیح برای دفتر فنی…' : 'Note for Technical Office…'}
                   />
                 </div>
-                <Textarea rows={2} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={() => void handleApproveItem(selected, rejectReason)}
+                  >
+                    {isFa ? 'تأیید' : 'Approve'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={actionLoading || !rejectReason.trim()}
+                    onClick={() => void handleRejectItem(selected)}
+                  >
+                    {isFa ? 'رد با کامنت' : 'Reject with comment'}
+                  </Button>
+                </div>
               </div>
-            ) : null}
+            ) : (
+              <>
+                <AiDraftViewer
+                  text={selected.aiGeneratedText ?? selected.description}
+                  status="draft_by_ai"
+                  labels={{
+                    ...pmAiLabelsForItem(t, selected.type, locale),
+                    approveSend:
+                      selected.type === 'subcontractor_instruction'
+                        ? subcontractors.length === 0
+                          ? isFa
+                            ? 'ارسال ممکن نیست — پیمانکار نیست'
+                            : 'Cannot send — no subcontractor'
+                          : selectedSubId
+                            ? `${isFa ? 'تأیید و ارسال به' : 'Approve & send to'} ${
+                                subcontractors.find((s) => s.id === selectedSubId)?.name ?? ''
+                              }`
+                            : isFa
+                              ? 'تأیید و ارسال به پیمانکار (انتخاب کنید)'
+                              : 'Approve & send to subcontractor (select)'
+                        : pmAiLabelsForItem(t, selected.type, locale).approveSend,
+                  }}
+                  forceShowActions
+                  loading={actionLoading}
+                  onApprove={
+                    selected.type === 'subcontractor_instruction' &&
+                    (subcontractors.length === 0 || !selectedSubId)
+                      ? undefined
+                      : (text) => handleApproveItem(selected, text)
+                  }
+                  onReject={() => handleRejectItem(selected)}
+                />
+                {selected.kind === 'ai_action' ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-xs text-muted-foreground">{t.rejectionReason}</label>
+                      <VoiceToTextButton
+                        onTranscript={(text) =>
+                          setRejectReason((prev) => (prev ? `${prev} ${text}` : text))
+                        }
+                      />
+                    </div>
+                    <Textarea
+                      rows={2}
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                    />
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
         ) : null}
       </ModalOverlay>

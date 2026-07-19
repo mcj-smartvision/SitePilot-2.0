@@ -17,6 +17,7 @@ import { LogoutButton } from '@/components/auth/logout-button'
 import { HeaderLanguageSwitcher } from '@/components/i18n/header-language-switcher'
 import { HeaderCalendarSwitcher } from '@/components/schedule/header-calendar-switcher'
 import { HeaderProjectSwitcher } from '@/components/project/header-project-switcher'
+import { MessengerButton } from '@/components/messaging/messenger-panel'
 
 const NAV_ITEMS = [
   { href: '/admin', label: 'Control Center', icon: LayoutDashboard, exact: true },
@@ -44,6 +45,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
         <div className="space-y-3 border-b border-slate-100 px-4 py-4">
           <HeaderProjectSwitcher className="[&_button]:w-full [&_button]:justify-between" />
           <div className="flex items-center gap-2">
+            <MessengerButton />
             <HeaderCalendarSwitcher className="shrink-0" />
             <HeaderLanguageSwitcher className="shrink-0" />
           </div>
@@ -92,6 +94,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
             <span className="font-bold">{APP_NAME}</span>
           </div>
           <div className="flex items-center gap-2">
+            <MessengerButton />
             <HeaderProjectSwitcher />
             <HeaderCalendarSwitcher />
             <HeaderLanguageSwitcher />

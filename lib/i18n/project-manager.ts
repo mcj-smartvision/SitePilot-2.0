@@ -55,6 +55,11 @@ const EN = {
   typePurchase: 'Purchase request → Procurement',
   typeHse: 'HSE alert',
   typeDailyReport: 'Daily report',
+  typeWorkshopPackage: 'Workshop item → Approve',
+  typeWorkshopChange: 'Workshop change request',
+  fromTechnicalOffice: 'From Technical Office',
+  workshopApprovalsLink: 'Open workshop approvals',
+  workshopApprovalsHint: 'Technical Office items waiting for your approval are listed below in Approval Center.',
 }
 
 export type ProjectManagerMessages = typeof EN
@@ -111,6 +116,12 @@ const FA = {
   typePurchase: 'درخواست خرید → تدارکات',
   typeHse: 'هشدار HSE',
   typeDailyReport: 'گزارش روزانه',
+  typeWorkshopPackage: 'آیتم کارگاه → تأیید',
+  typeWorkshopChange: 'درخواست تغییر کارگاه',
+  fromTechnicalOffice: 'از دفتر فنی',
+  workshopApprovalsLink: 'باز کردن تأییدات کارگاه',
+  workshopApprovalsHint:
+    'موارد ارسال‌شده توسط دفتر فنی همین‌جا در مرکز تأیید دیده می‌شوند؛ تأیید یا رد کنید.',
 } as const satisfies Record<keyof typeof EN, string>
 
 export function getProjectManagerMessages(locale: FormLocale): typeof EN {
@@ -158,6 +169,10 @@ export function pmApprovalTitle(
       return t.typeHse
     case 'daily_report':
       return t.typeDailyReport
+    case 'workshop_package':
+      return t.typeWorkshopPackage
+    case 'workshop_change':
+      return t.typeWorkshopChange
     default:
       return t.approvalCenter
   }

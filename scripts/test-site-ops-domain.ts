@@ -7,14 +7,18 @@ import { join } from 'path'
 import { parseCrePhase1Export } from '../lib/cre-contract'
 import {
   approveActual,
+  assertCanMarkCleanDone,
   assertPermission,
   buildDailyReport,
   canPromoteRow,
   generateDailyPlanDraft,
   issueDailyPlan,
+  mapSitePilotPositionToSiteOpsRoles,
   promoteCreRun,
+  setPaymentFlag,
   SiteOpsError,
   submitActual,
+  validateChildRollup,
 } from '../lib/site-ops-domain'
 
 function assert(cond: unknown, msg: string) {
@@ -165,5 +169,42 @@ const report = buildDailyReport({
 })
 assert(report.totals.qty_variance === -20, 'qty variance')
 assert(report.lines[0].productivity === 12.5, 'productivity')
+
+const toRoles = mapSitePilotPositionToSiteOpsRoles(['technical_office'])
+assert(toRoles.includes('TECHNICAL_OFFICE'), 'technical_office maps to TECHNICAL_OFFICE')
+
+const flagged = setPaymentFlag({
+  roles: ['TECHNICAL_OFFICE'],
+  flag: 'NeedsChangeReview',
+  reason: 'Poles without cabling in BOQ',
+})
+assert(flagged.payment_flag === 'NeedsChangeReview', 'payment flag set')
+
+let cleanDoneBlocked = false
+try {
+  assertCanMarkCleanDone({
+    paymentFlag: 'NeedsChangeReview',
+    pmRiskAcknowledged: false,
+    nextStatus: 'Done',
+  })
+} catch (e) {
+  cleanDoneBlocked = e instanceof SiteOpsError && e.code === 'PAYMENT_RISK'
+}
+assert(cleanDoneBlocked, 'clean Done blocked without PM ack')
+
+assertCanMarkCleanDone({
+  paymentFlag: 'NeedsChangeReview',
+  pmRiskAcknowledged: true,
+  nextStatus: 'Done',
+})
+
+validateChildRollup({ parentPlannedQty: 2, childrenPlannedQty: [1, 1] })
+let rollupFail = false
+try {
+  validateChildRollup({ parentPlannedQty: 2, childrenPlannedQty: [1, 0.5] })
+} catch (e) {
+  rollupFail = e instanceof SiteOpsError && e.code === 'ROLLUP_MISMATCH'
+}
+assert(rollupFail, 'rollup mismatch detected')
 
 console.log('site-ops domain tests: OK')

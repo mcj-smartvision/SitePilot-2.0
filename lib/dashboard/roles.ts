@@ -2,6 +2,7 @@
 export const SITE_ROLES = {
   PROJECT_MANAGER: 'project_manager',
   SITE_SUPERVISOR: 'site_supervisor',
+  TECHNICAL_OFFICE: 'technical_office',
   STOREKEEPER: 'storekeeper',
   PROCUREMENT: 'procurement_officer',
   QC: 'qa_qc_inspector',
@@ -16,6 +17,7 @@ export type SiteRoleKey = (typeof SITE_ROLES)[keyof typeof SITE_ROLES]
 export const SITE_ROLE_LABELS: Record<SiteRoleKey, string> = {
   project_manager: 'Project Manager',
   site_supervisor: 'Site Supervisor',
+  technical_office: 'Technical Office',
   storekeeper: 'Storekeeper',
   procurement_officer: 'Procurement',
   qa_qc_inspector: 'QC',
@@ -28,6 +30,7 @@ export const SITE_ROLE_LABELS: Record<SiteRoleKey, string> = {
 /** Higher index = lower priority when resolving a primary role. */
 export const ROLE_PRIORITY: SiteRoleKey[] = [
   SITE_ROLES.PROJECT_MANAGER,
+  SITE_ROLES.TECHNICAL_OFFICE,
   SITE_ROLES.SITE_SUPERVISOR,
   SITE_ROLES.QC,
   SITE_ROLES.HSE,
@@ -57,6 +60,12 @@ export const ROLE_WIDGET_KEYS: Record<SiteRoleKey, string[]> = {
     'schedule.overview',
     'safety.overview',
     'security.entry_exit',
+    'overview.stats',
+  ],
+  technical_office: [
+    'schedule.overview',
+    'progress.overview',
+    'reports.daily',
     'overview.stats',
   ],
   storekeeper: ['inventory.stock', 'overview.stats'],
