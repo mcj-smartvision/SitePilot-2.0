@@ -553,19 +553,38 @@ export async function listMessages(
     .maybeSingle()
   if (!conv) throw new MessagingError('NOT_FOUND', 'گفتگو پیدا نشد')
 
-  let { data, error } = await supabase
-    .from('project_messages')
-    .select('id, conversation_id, sender_id, body, created_at, forwarded_from_id')
-    .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true })
-    .limit(200)
+  type MessageRow = {
+    id: string
+    conversation_id: string
+    sender_id: string
+    body: string
+    created_at: string
+    forwarded_from_id?: string | null
+  }
+
+  let data: MessageRow[] | null = null
+  let error: { code?: string; message: string } | null = null
+
+  {
+    const first = await supabase
+      .from('project_messages')
+      .select('id, conversation_id, sender_id, body, created_at, forwarded_from_id')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+      .limit(200)
+    data = (first.data as MessageRow[] | null) ?? null
+    error = first.error
+  }
+
   if (error?.code === '42703') {
-    ;({ data, error } = await supabase
+    const fallback = await supabase
       .from('project_messages')
       .select('id, conversation_id, sender_id, body, created_at')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true })
-      .limit(200))
+      .limit(200)
+    data = (fallback.data as MessageRow[] | null) ?? null
+    error = fallback.error
   }
   if (error) throw new MessagingError('VALIDATION', error.message)
 
@@ -600,7 +619,7 @@ export async function listMessages(
 
   return (data ?? []).map((m) => {
     const contact = contactMap.get(m.sender_id)
-    const forwardedFromId = (m as { forwarded_from_id?: string | null }).forwarded_from_id ?? null
+    const forwardedFromId = m.forwarded_from_id ?? null
     return {
       id: m.id,
       conversationId: m.conversation_id,
