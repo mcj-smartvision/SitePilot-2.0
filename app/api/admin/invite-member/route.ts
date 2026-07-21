@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { isSystemAdmin } from '@/lib/admin/access'
 import { createServiceClient } from '@/lib/supabase/service'
 import { createProjectMember, findProfileByEmail } from '@/utils/admin'
-import { normalizeLoginIdentifier } from '@/lib/auth/login-identifier'
+import { normalizeLoginIdentifier, isDeliverableEmail } from '@/lib/auth/login-identifier'
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,11 +22,38 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { project_id, full_name, email, phone, password, is_active, position_ids } = body
+    const {
+      project_id,
+      full_name,
+      email,
+      contact_email,
+      contactEmail,
+      phone,
+      password,
+      is_active,
+      position_ids,
+    } = body
 
-    if (!project_id || !full_name || !email || !password) {
+    if (!project_id || !full_name || !password) {
       return NextResponse.json(
-        { error: 'project_id, full_name, email, and password are required' },
+        { error: 'project_id, full_name, and password are required' },
+        { status: 400 }
+      )
+    }
+
+    const realEmail = String(contact_email ?? contactEmail ?? '').trim().toLowerCase()
+    const usernameOrEmail = String(email ?? '').trim()
+
+    if (!realEmail && !usernameOrEmail) {
+      return NextResponse.json(
+        { error: 'Real email or username is required' },
+        { status: 400 }
+      )
+    }
+
+    if (realEmail && !isDeliverableEmail(realEmail)) {
+      return NextResponse.json(
+        { error: 'contact_email must be a real mailbox (not @site.local)' },
         { status: 400 }
       )
     }
@@ -42,7 +69,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 })
     }
 
-    const normalizedEmail = normalizeLoginIdentifier(String(email))
+    // Prefer real email as auth login; fall back to username@site.local
+    const normalizedEmail = realEmail
+      ? realEmail
+      : normalizeLoginIdentifier(usernameOrEmail)
     const service = createServiceClient()
     let profile = await findProfileByEmail(supabase, normalizedEmail)
 
@@ -56,7 +86,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: updateError.message }, { status: 400 })
       }
 
-      await supabase.from('profiles').update({ is_first_login: true }).eq('id', profile.id)
+      await supabase
+        .from('profiles')
+        .update({
+          is_first_login: true,
+          contact_email: realEmail || null,
+          full_name,
+        })
+        .eq('id', profile.id)
     } else {
       const { data: created, error: createError } = await service.auth.admin.createUser({
         email: normalizedEmail,
@@ -78,6 +115,16 @@ export async function POST(request: NextRequest) {
         email: created.user.email ?? normalizedEmail,
         full_name,
       }
+
+      await supabase
+        .from('profiles')
+        .upsert({
+          id: profile.id,
+          email: normalizedEmail,
+          full_name,
+          contact_email: realEmail || (isDeliverableEmail(normalizedEmail) ? normalizedEmail : null),
+          is_active: true,
+        })
     }
 
     const { data: existingMember } = await supabase
@@ -98,6 +145,7 @@ export async function POST(request: NextRequest) {
       {
         full_name,
         email: normalizedEmail,
+        contact_email: realEmail || undefined,
         phone,
         password: String(password),
         is_active: is_active ?? true,
@@ -105,6 +153,21 @@ export async function POST(request: NextRequest) {
       },
       user.id
     )
+
+    if (realEmail) {
+      await supabase
+        .from('profiles')
+        .update({
+          contact_email: realEmail,
+          personnel_code: body.personnel_code ?? body.personnelCode ?? null,
+        })
+        .eq('id', profile.id)
+    } else if (body.personnel_code || body.personnelCode) {
+      await supabase
+        .from('profiles')
+        .update({ personnel_code: body.personnel_code ?? body.personnelCode })
+        .eq('id', profile.id)
+    }
 
     return NextResponse.json({ member }, { status: 201 })
   } catch (error) {

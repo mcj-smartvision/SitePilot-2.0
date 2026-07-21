@@ -7,7 +7,11 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ConstructionRoleSelect } from '@/components/admin/construction-role-select'
-import { normalizeLoginIdentifier } from '@/lib/auth/login-identifier'
+import {
+  formatLoginDisplay,
+  isDeliverableEmail,
+  normalizeLoginIdentifier,
+} from '@/lib/auth/login-identifier'
 import { getAdminMemberMessages } from '@/lib/i18n/admin-member'
 import { useLocale } from '@/components/i18n/locale-provider'
 import type { CreateMemberInput, Position, ProjectMember } from '@/types/admin'
@@ -17,7 +21,7 @@ interface MemberFormProps {
   positions: Position[]
   initial?: Partial<ProjectMember> & { position_ids?: string[] }
   submitLabel: string
-  onSubmit: (values: CreateMemberInput) => Promise<void>
+  onSubmit: (values: CreateMemberInput & { contact_email?: string }) => Promise<void>
   showPasswordField?: boolean
   positionsLoading?: boolean
   onSeedPositions?: () => Promise<void>
@@ -35,7 +39,16 @@ export function MemberForm({
   const { locale } = useLocale()
   const t = getAdminMemberMessages(locale)
   const [fullName, setFullName] = useState(initial?.full_name ?? '')
-  const [email, setEmail] = useState(initial?.email ?? '')
+  const [username, setUsername] = useState(
+    initial?.email ? formatLoginDisplay(initial.email) : ''
+  )
+  const [contactEmail, setContactEmail] = useState(
+    initial?.contact_email ||
+      (initial?.email && !initial.email.toLowerCase().endsWith('@site.local')
+        ? initial.email
+        : '')
+  )
+  const [personnelCode, setPersonnelCode] = useState(initial?.personnel_code ?? '')
   const [phone, setPhone] = useState(initial?.phone ?? '')
   const [password, setPassword] = useState('')
   const [isActive, setIsActive] = useState(initial?.is_active ?? true)
@@ -71,8 +84,26 @@ export function MemberForm({
       return
     }
 
+    const emailTrimmed = contactEmail.trim().toLowerCase()
+    if (emailTrimmed && !isDeliverableEmail(emailTrimmed)) {
+      setError(t.emailInvalidError)
+      return
+    }
+
     if (showPasswordField && password.length < 6) {
       setError(t.passwordMinError)
+      return
+    }
+
+    // New members: prefer real email as login; otherwise username@site.local
+    const loginEmail = showPasswordField
+      ? emailTrimmed && isDeliverableEmail(emailTrimmed)
+        ? emailTrimmed
+        : normalizeLoginIdentifier(username.trim())
+      : normalizeLoginIdentifier(username.trim() || initial?.email || '')
+
+    if (showPasswordField && !loginEmail) {
+      setError(t.usernameOrEmailRequired)
       return
     }
 
@@ -80,7 +111,9 @@ export function MemberForm({
     try {
       await onSubmit({
         full_name: fullName.trim(),
-        email: normalizeLoginIdentifier(email.trim()),
+        email: loginEmail,
+        contact_email: emailTrimmed || undefined,
+        personnel_code: personnelCode.trim() || undefined,
         phone: phone.trim() || undefined,
         password: showPasswordField ? password : (initial?.admin_visible_password ?? ''),
         is_active: isActive,
@@ -129,19 +162,44 @@ export function MemberForm({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="member-email">{t.username}</Label>
+              <Label htmlFor="member-username">{t.username}</Label>
               <Input
-                id="member-email"
+                id="member-username"
                 type="text"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required={showPasswordField && !contactEmail.trim()}
                 disabled={Boolean(initial)}
                 className="h-11"
-                placeholder="member.username"
+                placeholder="jimi"
               />
               <p className="text-xs text-muted-foreground">{t.usernameHint}</p>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="member-contact-email">{t.email}</Label>
+            <Input
+              id="member-contact-email"
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              className="h-11"
+              placeholder="name@gmail.com"
+              required={showPasswordField}
+            />
+            <p className="text-xs text-muted-foreground">{t.emailHint}</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="member-personnel-code">کد پرسنلی</Label>
+            <Input
+              id="member-personnel-code"
+              value={personnelCode}
+              onChange={(e) => setPersonnelCode(e.target.value)}
+              className="h-11 font-mono"
+              placeholder="مثلاً 1403-012"
+            />
           </div>
 
           <ConstructionRoleSelect

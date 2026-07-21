@@ -26,6 +26,10 @@ export interface AdminMemberMessages {
   fullName: string
   username: string
   usernameHint: string
+  email: string
+  emailHint: string
+  emailInvalidError: string
+  usernameOrEmailRequired: string
   initialPassword: string
   passwordHint: string
   phoneOptional: string
@@ -64,7 +68,11 @@ export const ADMIN_MEMBER: Record<'en' | 'fa' | 'fr' | 'de', AdminMemberMessages
     loadingPositions: 'Loading positions...',
     fullName: 'Full Name',
     username: 'Username',
-    usernameHint: 'Plain username only — no @ needed. Example: sahar',
+    usernameHint: 'Plain username only — no @. Example: jimi (optional if real email is set)',
+    email: 'Email',
+    emailHint: 'Real email for login notifications and attendance alerts. Example: name@gmail.com',
+    emailInvalidError: 'Enter a real email address (not @site.local).',
+    usernameOrEmailRequired: 'Enter a username or a real email.',
     initialPassword: 'Initial Password',
     passwordHint: 'Admin can view this password. Member must change it on first login.',
     phoneOptional: 'Phone (optional)',
@@ -101,7 +109,11 @@ export const ADMIN_MEMBER: Record<'en' | 'fa' | 'fr' | 'de', AdminMemberMessages
     loadingPositions: 'بارگذاری نقش‌ها...',
     fullName: 'نام کامل',
     username: 'نام کاربری',
-    usernameHint: 'فقط نام کاربری — بدون @. مثال: sahar',
+    usernameHint: 'فقط نام کاربری ساده — بدون @. مثال: jimi (اگر ایمیل واقعی دارید اختیاری است)',
+    email: 'ایمیل',
+    emailHint: 'ایمیل واقعی برای اعلان ورود/خروج. مثال: name@gmail.com — با ذخیره، لاگین هم به همین ایمیل عوض می‌شود',
+    emailInvalidError: 'ایمیل باید واقعی باشد (نه @site.local).',
+    usernameOrEmailRequired: 'نام کاربری یا ایمیل واقعی لازم است.',
     initialPassword: 'رمز اولیه',
     passwordHint: 'مدیر می‌تواند رمز را ببیند. عضو باید در اولین ورود تغییر دهد.',
     phoneOptional: 'تلفن (اختیاری)',
@@ -138,7 +150,11 @@ export const ADMIN_MEMBER: Record<'en' | 'fa' | 'fr' | 'de', AdminMemberMessages
     loadingPositions: 'Chargement des postes...',
     fullName: 'Nom complet',
     username: 'Nom d\'utilisateur',
-    usernameHint: 'Nom d\'utilisateur simple — sans @. Ex: sahar',
+    usernameHint: 'Nom d\'utilisateur simple — sans @. Ex: jimi',
+    email: 'E-mail',
+    emailHint: 'E-mail réelle pour les notifications. Ex: name@gmail.com',
+    emailInvalidError: 'Entrez une adresse e-mail réelle (pas @site.local).',
+    usernameOrEmailRequired: 'Nom d\'utilisateur ou e-mail requis.',
     initialPassword: 'Mot de passe initial',
     passwordHint: 'L\'admin peut voir ce mot de passe.',
     phoneOptional: 'Téléphone (optionnel)',
@@ -175,7 +191,11 @@ export const ADMIN_MEMBER: Record<'en' | 'fa' | 'fr' | 'de', AdminMemberMessages
     loadingPositions: 'Positionen werden geladen...',
     fullName: 'Vollständiger Name',
     username: 'Benutzername',
-    usernameHint: 'Nur Benutzername — ohne @. z.B. sahar',
+    usernameHint: 'Nur Benutzername — ohne @. z.B. jimi',
+    email: 'E-Mail',
+    emailHint: 'Echte E-Mail für Benachrichtigungen. z.B. name@gmail.com',
+    emailInvalidError: 'Echte E-Mail eingeben (nicht @site.local).',
+    usernameOrEmailRequired: 'Benutzername oder E-Mail erforderlich.',
     initialPassword: 'Anfangspasswort',
     passwordHint: 'Admin kann dieses Passwort sehen.',
     phoneOptional: 'Telefon (optional)',

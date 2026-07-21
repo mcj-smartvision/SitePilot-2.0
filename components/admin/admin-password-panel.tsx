@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatLoginDisplay } from '@/lib/auth/login-identifier'
 import type { ProjectMember } from '@/types/admin'
 
 interface AdminPasswordPanelProps {
@@ -42,8 +43,21 @@ export function AdminPasswordPanel({ member, onReset }: AdminPasswordPanelProps)
       <CardContent className="space-y-4">
         <div className="rounded-md border bg-muted/40 p-4 space-y-2">
           <p className="text-sm">
-            <span className="font-medium">Username:</span> {member.email}
+            <span className="font-medium">Username:</span> {formatLoginDisplay(member.email)}
           </p>
+          {member.contact_email ? (
+            <p className="text-sm">
+              <span className="font-medium">Email:</span> {member.contact_email}
+            </p>
+          ) : !member.email?.toLowerCase().endsWith('@site.local') ? (
+            <p className="text-sm">
+              <span className="font-medium">Email:</span> {member.email}
+            </p>
+          ) : (
+            <p className="text-xs text-amber-700">
+              ایمیل واقعی هنوز ثبت نشده — برای اعلان ورود/خروج در فرم پایین ایمیل بگذارید.
+            </p>
+          )}
           <p className="text-sm">
             <span className="font-medium">Current admin-visible password:</span>{' '}
             {member.admin_visible_password || '—'}

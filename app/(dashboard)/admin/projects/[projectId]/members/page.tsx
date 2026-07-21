@@ -134,6 +134,9 @@ export default function ProjectMembersPage({ params }: { params: { projectId: st
                       <StatusBadge active={member.is_active} />
                     </div>
                     <p className="text-sm text-muted-foreground font-mono">{formatLoginDisplay(member.email)}</p>
+                    {member.contact_email ? (
+                      <p className="text-sm text-muted-foreground">{member.contact_email}</p>
+                    ) : null}
                     <p className="text-sm">
                       <span className="font-medium">{t.initialPassword}:</span>{' '}
                       {member.admin_visible_password || '—'}

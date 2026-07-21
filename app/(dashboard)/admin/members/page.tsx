@@ -233,6 +233,7 @@ export default function AdminMembersPage() {
                     <th className="text-left font-medium text-muted-foreground px-4 py-3">{t.fullName}</th>
                     <th className="text-left font-medium text-muted-foreground px-4 py-3">{t.siteRole}</th>
                     <th className="text-left font-medium text-muted-foreground px-4 py-3">{t.username}</th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-3">{t.email}</th>
                     <th className="text-left font-medium text-muted-foreground px-4 py-3">{t.initialPassword}</th>
                     <th className="text-left font-medium text-muted-foreground px-4 py-3">Status</th>
                     <th className="text-right font-medium text-muted-foreground px-4 py-3">Actions</th>
@@ -254,6 +255,12 @@ export default function AdminMembersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3.5 font-mono text-xs">{formatLoginDisplay(member.email)}</td>
+                      <td className="px-4 py-3.5 text-xs">
+                        {member.contact_email ||
+                          (!member.email.toLowerCase().endsWith('@site.local') ? member.email : (
+                            <span className="text-muted-foreground">—</span>
+                          ))}
+                      </td>
                       <td className="px-4 py-3.5">
                         <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
                           {member.admin_visible_password || '—'}

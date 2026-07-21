@@ -10,7 +10,7 @@ export const ROLE_DASHBOARD_ACCESS: Record<string, (SiteRoleKey | 'finance_admin
   procurement: ['procurement_officer'],
   qc: ['qa_qc_inspector'],
   hse: ['hse_officer'],
-  security: ['security'],
+  security: ['security', 'project_manager', 'site_manager'],
   accountant: ['project_accountant', 'finance_admin'],
 }
 

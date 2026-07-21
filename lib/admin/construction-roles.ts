@@ -184,7 +184,7 @@ export const ROLE_DASHBOARD_PREVIEWS: RoleDashboardPreview[] = [
       { label: 'Alerts', value: '—', trend: 'warning' },
       { label: 'Visitors', value: '—', trend: 'neutral' },
     ],
-    alerts: ['Gate module — coming soon'],
+    alerts: ['Live gate transit + presence lists available'],
   },
   {
     key: 'planning_engineer',

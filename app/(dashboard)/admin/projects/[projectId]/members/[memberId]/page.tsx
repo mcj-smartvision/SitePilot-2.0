@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSupabase } from '@/hooks/useSupabase'
-import { fetchPositions, fetchProjectMember, updateProjectMember } from '@/utils/admin'
+import { fetchPositions, fetchProjectMember } from '@/utils/admin'
 import { PageHeader, LoadingBlock, ErrorBlock } from '@/components/admin/shared'
 import { MemberForm } from '@/components/admin/member-form'
 import { AdminPasswordPanel } from '@/components/admin/admin-password-panel'
 import { Button } from '@/components/ui/button'
-import type { CreateMemberInput, Position, ProjectMember } from '@/types/admin'
+import type { Position, ProjectMember } from '@/types/admin'
 
 export default function MemberProfilePage({
   params,
@@ -94,13 +94,23 @@ export default function MemberProfilePage({
         }}
         submitLabel="Save changes"
         showPasswordField={false}
-        onSubmit={async (values: CreateMemberInput) => {
-          await updateProjectMember(supabase, member.id, {
-            full_name: values.full_name,
-            phone: values.phone,
-            is_active: values.is_active,
-            position_ids: values.position_ids,
+        onSubmit={async (values) => {
+          const response = await fetch('/api/admin/update-member', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              member_id: member.id,
+              full_name: values.full_name,
+              phone: values.phone,
+              is_active: values.is_active,
+              position_ids: values.position_ids,
+              contact_email: values.contact_email ?? null,
+              personnel_code: values.personnel_code ?? null,
+              migrate_login: true,
+            }),
           })
+          const data = await response.json()
+          if (!response.ok) throw new Error(data.error || 'Failed to update member')
           setSaved(true)
           await loadMember()
           router.refresh()

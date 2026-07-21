@@ -3,7 +3,9 @@ export interface Profile {
   email: string
   full_name: string
   phone?: string | null
+  contact_email?: string | null
   avatar_url?: string | null
+  personnel_code?: string | null
   is_active: boolean
   is_first_login?: boolean
   created_at: string
@@ -42,6 +44,8 @@ export interface ProjectMember {
   email: string
   full_name: string
   phone?: string | null
+  contact_email?: string | null
+  personnel_code?: string | null
   is_active: boolean
   invited_at?: string | null
   joined_at?: string | null
@@ -150,6 +154,9 @@ export interface CreatePositionInput {
 export interface CreateMemberInput {
   full_name: string
   email: string
+  /** Real mailbox for notifications (and preferred login when provided) */
+  contact_email?: string
+  personnel_code?: string
   phone?: string
   password: string
   is_active?: boolean
@@ -159,10 +166,14 @@ export interface CreateMemberInput {
 export interface UpdateMemberInput {
   full_name?: string
   email?: string
+  contact_email?: string | null
+  personnel_code?: string | null
   phone?: string
   is_active?: boolean
   position_ids?: string[]
   password?: string
+  /** When true and contact_email is real, migrate auth login off @site.local */
+  migrateLoginToContactEmail?: boolean
 }
 
 export interface NotificationRouteInput {

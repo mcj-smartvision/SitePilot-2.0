@@ -97,8 +97,12 @@ export const UI_BLOCK_CATALOG: UiBlockDefinition[] = [
   { code: 'HSE-TBL-01', key: 'hse.table.hazards', kind: 'table', dashboard: 'hse', layer: 'operational', titleFa: 'ثبت مخاطره', titleEn: 'Hazard Log', descriptionFa: 'planned', sortOrder: 620, defaultVisible: true },
   { code: 'HSE-TBL-02', key: 'hse.table.incidents', kind: 'table', dashboard: 'hse', layer: 'operational', titleFa: 'حوادث', titleEn: 'Incidents', descriptionFa: 'planned', sortOrder: 621, defaultVisible: true },
 
-  // ─── SEC: Security ───
-  { code: 'SEC-PNL-01', key: 'sec.panel.placeholder', kind: 'panel', dashboard: 'security', layer: 'general', titleFa: 'داشبورد امنیت', titleEn: 'Security Dashboard', descriptionFa: 'placeholder', sortOrder: 710, defaultVisible: true },
+  // ─── SEC: Security / Attendance ───
+  { code: 'SEC-KPI-01', key: 'sec.kpi.presence', kind: 'kpi', dashboard: 'security', layer: 'executive', titleFa: 'خلاصه حضور', titleEn: 'Presence KPIs', descriptionFa: 'داخل، بیرون، غایب، تردد', sortOrder: 710, defaultVisible: true },
+  { code: 'SEC-ACT-01', key: 'sec.action.gate_log', kind: 'action', dashboard: 'security', layer: 'operational', titleFa: 'ثبت تردد گیت', titleEn: 'Gate Transit Log', descriptionFa: 'شناسایی و ثبت ورود/خروج', sortOrder: 720, defaultVisible: true },
+  { code: 'SEC-PNL-02', key: 'sec.panel.live_lists', kind: 'panel', dashboard: 'security', layer: 'operational', titleFa: 'لیست‌های زنده', titleEn: 'Live Presence Lists', descriptionFa: 'داخل / بیرون / غایب', sortOrder: 730, defaultVisible: true },
+  { code: 'SEC-TBL-01', key: 'sec.table.transits', kind: 'table', dashboard: 'security', layer: 'operational', titleFa: 'جدول ترددها', titleEn: 'Transit Log', descriptionFa: 'همه رویدادهای شناسایی امروز', sortOrder: 740, defaultVisible: true },
+  { code: 'SEC-PNL-01', key: 'sec.panel.placeholder', kind: 'panel', dashboard: 'security', layer: 'general', titleFa: 'داشبورد امنیت', titleEn: 'Security Dashboard', descriptionFa: 'legacy placeholder', sortOrder: 799, defaultVisible: false },
 
   // ─── ACC: Project Accountant (financial layer) ───
   { code: 'ACC-KPI-01', key: 'acc.kpi.total_ac', kind: 'kpi', dashboard: 'accountant', layer: 'executive', titleFa: 'جمع هزینه واقعی (AC)', titleEn: 'Total AC', descriptionFa: 'مجموع actual cost از financial_costs', sortOrder: 810, defaultVisible: true },
