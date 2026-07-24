@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.LipartaAccountant" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/liparta_accent</item>
+        <item name="android:statusBarColor">@color/liparta_bg</item>
+        <item name="android:navigationBarColor">@color/liparta_surface</item>
+        <item name="android:windowBackground">@color/liparta_surface</item>
+    </style>
+
+    <style name="Theme.LipartaAccountant.Splash" parent="Theme.LipartaAccountant">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="liparta_bg">#161B26</color>
+    <color name="liparta_accent">#D97706</color>
+    <color name="liparta_surface">#0B0E14</color>
+    <color name="white">#FFFFFF</color>
+</resources>

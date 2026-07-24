@@ -64,6 +64,8 @@ interface ContractorPayablesProps {
   projectOptions: { id: string; name: string }[]
   initialProjectId: string | null
   canEdit?: boolean
+  /** Hide desktop chrome when shown inside the mobile accountant shell. */
+  embedded?: boolean
 }
 
 function todayDate() {
@@ -97,6 +99,7 @@ export function ContractorPayables({
   projectOptions,
   initialProjectId,
   canEdit = false,
+  embedded = false,
 }: ContractorPayablesProps) {
   const supabase = useSupabase()
   const { locale, dir } = useLocale()
@@ -265,38 +268,42 @@ export function ContractorPayables({
 
   if (!projectId) {
     return (
-      <div className="space-y-6 p-4 sm:p-6" dir={dir}>
-        <PageHeader title={t.title} description={t.pageDescription} />
+      <div className={cn('space-y-6', !embedded && 'p-4 sm:p-6')} dir={dir}>
+        {!embedded ? <PageHeader title={t.title} description={t.pageDescription} /> : null}
         <EmptyState title={t.noProject} description={t.noProject} />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6" dir={dir}>
+    <div className={cn('space-y-6', !embedded && 'p-4 sm:p-6', embedded && 'space-y-4')} dir={dir}>
       <PageHeader
         title={t.title}
-        description={t.pageDescription}
+        description={embedded ? undefined : t.pageDescription}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" asChild>
-              <Link href="/dashboard/accountant">{t.backToDashboard}</Link>
-            </Button>
-            <Button type="button" variant="outline" asChild>
-              <Link href="/finance/expenses">{t.manageExpenses}</Link>
-            </Button>
-            <Select value={projectId} onValueChange={handleProjectChange}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder={t.selectProject} />
-              </SelectTrigger>
-              <SelectContent>
-                {projectOptions.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {!embedded ? (
+              <>
+                <Button type="button" variant="outline" asChild>
+                  <Link href="/dashboard/accountant">{t.backToDashboard}</Link>
+                </Button>
+                <Button type="button" variant="outline" asChild>
+                  <Link href="/finance/expenses">{t.manageExpenses}</Link>
+                </Button>
+                <Select value={projectId} onValueChange={handleProjectChange}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder={t.selectProject} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projectOptions.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            ) : null}
             {canEdit ? (
               <Button
                 type="button"

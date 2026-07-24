@@ -107,6 +107,8 @@ interface ExpenseManagementProps {
   projectOptions: { id: string; name: string }[]
   initialProjectId: string | null
   canEdit?: boolean
+  /** Hide desktop chrome when shown inside the mobile accountant shell. */
+  embedded?: boolean
 }
 
 type SortKey = 'document_date' | 'amount' | 'created_at' | 'status' | 'supplier_name'
@@ -133,6 +135,7 @@ export function ExpenseManagement({
   projectOptions,
   initialProjectId,
   canEdit = false,
+  embedded = false,
 }: ExpenseManagementProps) {
   const supabase = useSupabase()
   const { locale, dir } = useLocale()
@@ -905,40 +908,44 @@ export function ExpenseManagement({
 
   if (!projectId) {
     return (
-      <div className="space-y-6 p-4 sm:p-6" dir={dir}>
-        <PageHeader title={t.title} description={t.pageDescription} />
+      <div className={cn('space-y-6', !embedded && 'p-4 sm:p-6')} dir={dir}>
+        {!embedded ? <PageHeader title={t.title} description={t.pageDescription} /> : null}
         <EmptyState title={t.noProject} description={t.noProject} />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6" dir={dir}>
+    <div className={cn('space-y-6', !embedded && 'p-4 sm:p-6', embedded && 'space-y-4')} dir={dir}>
       <PageHeader
         title={t.title}
-        description={t.pageDescription}
+        description={embedded ? undefined : t.pageDescription}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" asChild>
-              <Link href="/dashboard/accountant">{t.backToDashboard}</Link>
-            </Button>
-            <Button type="button" variant="outline" asChild>
-              <Link href="/finance/payables">
-                {isFa ? 'بدهی پیمانکاران' : 'Contractor Payables'}
-              </Link>
-            </Button>
-            <Select value={projectId} onValueChange={handleProjectChange}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder={t.selectProject} />
-              </SelectTrigger>
-              <SelectContent>
-                {projectOptions.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {!embedded ? (
+              <>
+                <Button type="button" variant="outline" asChild>
+                  <Link href="/dashboard/accountant">{t.backToDashboard}</Link>
+                </Button>
+                <Button type="button" variant="outline" asChild>
+                  <Link href="/finance/payables">
+                    {isFa ? 'بدهی پیمانکاران' : 'Contractor Payables'}
+                  </Link>
+                </Button>
+                <Select value={projectId} onValueChange={handleProjectChange}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder={t.selectProject} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projectOptions.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            ) : null}
             <Button type="button" variant="outline" onClick={() => void handleExportCsv()}>
               <FileSpreadsheet className="h-4 w-4 me-1" />
               {t.exportCsv}

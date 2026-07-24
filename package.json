@@ -15,7 +15,8 @@
     "generate:financial-seed": "node scripts/generate-financial-test-data.mjs",
     "test:site-ops": "npx tsx scripts/test-site-ops-domain.ts",
     "test:workshop": "npx tsx scripts/test-workshop-domain.ts",
-    "test:attendance": "npx tsx scripts/test-attendance-domain.ts"
+    "test:attendance": "npx tsx scripts/test-attendance-domain.ts",
+    "android:accountant:open": "echo Open android-accountant/ in Android Studio (see android-accountant/README.md)"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
