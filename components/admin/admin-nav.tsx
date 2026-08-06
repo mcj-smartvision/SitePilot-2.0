@@ -234,7 +234,7 @@ function AdminFlatNav({ compact }: { compact?: boolean }) {
         onClick={() => selectDetail('alerts')}
       />
       <FlatAction
-        label={fa ? 'داشبورد اعضا' : 'Members'}
+        label={fa ? 'داشبورد اعضا' : 'Member Dashboards'}
         icon={Users}
         count={ctx?.members.length}
         active={openDetail === 'dashboards'}

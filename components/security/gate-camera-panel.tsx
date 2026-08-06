@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Camera, Loader2, Radio, Search, Square, UserPlus } from 'lucide-react'
+import { Camera, Info, Loader2, Pencil, Radio, Search, Square, Trash2, UserPlus } from 'lucide-react'
 import { SectionCard } from '@/components/admin/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +29,12 @@ import {
   playConfirmBeep,
   type FaceBox,
 } from '@/lib/attendance/face-detect'
+import {
+  extractAveragedEmbedding,
+  extractFaceEmbedding,
+  warmFaceEmbedder,
+} from '@/lib/attendance/face-embed.client'
+import { FaceRecognitionMethodModal } from '@/components/security/face-recognition-method-modal'
 import type { AttendanceEnrollment, AttendanceGate, AttendanceTransit } from '@/lib/attendance/types'
 import { cn } from '@/lib/utils'
 
@@ -46,9 +52,16 @@ interface GateCameraPanelProps {
 }
 
 /** How often to call the recognize API while watching */
-const WATCH_INTERVAL_MS = 1200
+const WATCH_INTERVAL_MS = 900
 /** Face-box detector cadence (every-frame was too heavy) */
 const BOX_DETECT_MS = 140
+/** Multi-sample biometric enroll */
+const ENROLL_SAMPLE_COUNT = 5
+const ENROLL_SAMPLE_GAP_MS = 380
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+}
 
 export function GateCameraPanel({
   projectId,
@@ -80,9 +93,13 @@ export function GateCameraPanel({
   const [enrollments, setEnrollments] = useState<AttendanceEnrollment[]>([])
   const [enrollUserId, setEnrollUserId] = useState('')
   const [memberQuery, setMemberQuery] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [rowBusyId, setRowBusyId] = useState<string | null>(null)
   const [statusText, setStatusText] = useState<string | null>(null)
   const [emailHint, setEmailHint] = useState<string | null>(null)
   const [flashName, setFlashName] = useState<string | null>(null)
+  const [methodOpen, setMethodOpen] = useState(false)
   const lastDetectAtRef = useRef(0)
   const flashTimerRef = useRef<number | null>(null)
 
@@ -210,33 +227,34 @@ export function GateCameraPanel({
       return
     }
 
-    // Largest 1–2 faces only — faster round-trip
+    // Largest 1–2 faces → FaceNet embeddings (not LLM image compare)
     const crops = boxes
       .slice(0, 2)
-      .map((b) => cropFaceFromVideo(video, b, 0.3, 0.7))
+      .map((b) => cropFaceFromVideo(video, b, 0.35, 0.92))
       .filter((f): f is string => Boolean(f))
 
-    const faces =
-      crops.length > 0
-        ? crops
-        : (() => {
-            const frame = captureVideoFrame(video, 0.7)
-            return frame ? [frame.dataUrl] : []
-          })()
-
-    if (faces.length === 0) return
+    if (crops.length === 0) return
 
     recognizingRef.current = true
-    setStatusText(`شناسایی ${faces.length} صورت...`)
+    setStatusText(`استخراج بیومتریک ${crops.length} صورت...`)
     try {
+      const embeddings: number[][] = []
+      for (const crop of crops) {
+        const emb = await extractFaceEmbedding(crop)
+        if (emb) embeddings.push(emb)
+      }
+      if (embeddings.length === 0) {
+        setStatusText('چهره دیده شد ولی بردار بیومتریک استخراج نشد — نور/زاویه را بهتر کنید')
+        return
+      }
+
       const res = await fetch('/api/attendance/recognize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
           gateId: selectedGateIdRef.current || null,
-          faces,
-          mimeType: 'image/jpeg',
+          embeddings,
           auto: true,
         }),
       })
@@ -252,6 +270,7 @@ export function GateCameraPanel({
         personName?: string | null
         transit?: AttendanceTransit | null
         confidence?: number
+        reason?: string
       }>
 
       const labels: Array<string | null> = boxes.map(() => null)
@@ -263,7 +282,6 @@ export function GateCameraPanel({
           if (r.transit && !r.duplicate) {
             anyNew = true
             onTransitRecorded(r.transit)
-            // Instant feedback first (beep + big name), then short speech
             playConfirmBeep()
             showFlash(r.personName)
             announceRecognized(r.personName)
@@ -284,6 +302,8 @@ export function GateCameraPanel({
         setStatusText(`ثبت شد: ${names.join('، ')}`)
       } else if (results.some((r) => r.matched && r.duplicate)) {
         setStatusText('قبلاً ثبت شده — نزدیک گیت بمانید')
+      } else if (results.some((r) => r.reason?.includes('ambiguous'))) {
+        setStatusText('شباهت مبهم بین دو نفر — نزدیک‌تر و روبه‌رو بایستید')
       } else {
         setStatusText('صورت دیده شد — هنوز با افراد ثبت‌شده جور نشد')
       }
@@ -362,15 +382,26 @@ export function GateCameraPanel({
   async function startAutoWatch() {
     onError(null)
     if (enrollments.length === 0) {
-      onError('اول حداقل یک نفر را با «ثبت شناسایی اولیه» ثبت کنید')
+      onError('اول حداقل یک نفر را با «ثبت بیومتریک» ثبت کنید')
+      return
+    }
+    if (!enrollments.some((e) => e.hasEmbedding)) {
+      onError('ثبت‌های قبلی فقط عکس دارند — همه را دوباره با ثبت بیومتریک چندنمونه‌ای ثبت کنید')
       return
     }
     if (!previewOn) {
       await searchCameras()
     }
+    setStatusText('بارگذاری مدل FaceNet…')
+    try {
+      await warmFaceEmbedder()
+    } catch {
+      onError('بارگذاری مدل شناسایی چهره ناموفق بود — اینترنت/CDN را بررسی کنید')
+      return
+    }
     watchRef.current = true
     setWatching(true)
-    setStatusText('پایش خودکار روشن شد — نیازی به زدن دکمه ثبت نیست')
+    setStatusText('پایش بیومتریک روشن شد — تردد با تطبیق بردار چهره ثبت می‌شود')
   }
 
   function stopAutoWatch() {
@@ -388,19 +419,42 @@ export function GateCameraPanel({
     onError(null)
     try {
       const video = videoRef.current
-      let imageBase64: string | null = null
-      if (video) {
-        const boxes = await detectFacesInVideo(video)
-        const best = boxes[0]
-        if (best) imageBase64 = cropFaceFromVideo(video, best, 0.45, 0.94)
-      }
-      if (!imageBase64 && video) {
-        imageBase64 = captureVideoFrame(video, 0.92)?.dataUrl ?? null
-      }
-      if (!imageBase64) {
-        onError('گرفتن تصویر از دوربین ناموفق بود')
+      if (!video) {
+        onError('دوربین آماده نیست')
         return
       }
+
+      setStatusText(`ثبت بیومتریک — ${ENROLL_SAMPLE_COUNT} نمونه (کمی سر را چپ/راست کنید)`)
+      await warmFaceEmbedder()
+
+      const crops: string[] = []
+      let previewCrop: string | null = null
+
+      for (let i = 0; i < ENROLL_SAMPLE_COUNT; i++) {
+        const boxes = await detectFacesInVideo(video)
+        const best = boxes[0]
+        const crop = best
+          ? cropFaceFromVideo(video, best, 0.4, 0.94)
+          : captureVideoFrame(video, 0.94)?.dataUrl ?? null
+        if (crop) {
+          crops.push(crop)
+          if (!previewCrop) previewCrop = crop
+        }
+        setStatusText(`نمونه ${i + 1}/${ENROLL_SAMPLE_COUNT}…`)
+        if (i < ENROLL_SAMPLE_COUNT - 1) await sleep(ENROLL_SAMPLE_GAP_MS)
+      }
+
+      if (crops.length < 3) {
+        onError('حداقل ۳ نمونه واضح از چهره لازم است — نور بهتر و روبه‌روی دوربین بایستید')
+        return
+      }
+
+      const averaged = await extractAveragedEmbedding(crops)
+      if (!averaged) {
+        onError('استخراج بردار بیومتریک ناموفق بود — دوباره تلاش کنید')
+        return
+      }
+
       const member = members.find((m) => m.userId === enrollUserId)
       const res = await fetch('/api/attendance/enrollments', {
         method: 'POST',
@@ -409,14 +463,17 @@ export function GateCameraPanel({
           projectId,
           userId: enrollUserId,
           personName: member?.fullName,
-          imageBase64,
+          imageBase64: previewCrop,
           mimeType: 'image/jpeg',
+          faceEmbedding: averaged.embedding,
+          embeddingModel: averaged.model,
+          sampleCount: averaged.sampleCount,
         }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'ثبت شناسایی ناموفق')
       setStatusText(
-        `شناسایی اولیه «${member?.fullName}» با کراپ صورت ذخیره شد — پایش خودکار را روشن کنید`
+        `بیومتریک «${member?.fullName}» با ${averaged.sampleCount} نمونه ذخیره شد — پایش خودکار را روشن کنید`
       )
       await loadEnrollments()
       onEnrolled?.()
@@ -424,6 +481,72 @@ export function GateCameraPanel({
       onError(e instanceof Error ? e.message : 'ثبت شناسایی ناموفق')
     } finally {
       setBusy(false)
+    }
+  }
+
+  function startReEnroll(enrollment: AttendanceEnrollment) {
+    setEnrollUserId(enrollment.userId)
+    setEditingId(null)
+    setStatusText(
+      `فرد «${enrollment.personName || 'انتخاب‌شده'}» برای ثبت مجدد انتخاب شد — دوربین را روشن کنید و «ثبت بیومتریک» را بزنید`
+    )
+  }
+
+  function startRename(enrollment: AttendanceEnrollment) {
+    setEditingId(enrollment.id)
+    setEditName(enrollment.personName || '')
+  }
+
+  async function saveEnrollmentName(enrollmentId: string) {
+    setRowBusyId(enrollmentId)
+    onError(null)
+    try {
+      const res = await fetch('/api/attendance/enrollments', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          enrollmentId,
+          personName: editName,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'ویرایش نام ناموفق')
+      setEditingId(null)
+      setStatusText('نام به‌روز شد')
+      await loadEnrollments()
+      onEnrolled?.()
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'ویرایش نام ناموفق')
+    } finally {
+      setRowBusyId(null)
+    }
+  }
+
+  async function removeEnrollment(enrollment: AttendanceEnrollment) {
+    const label = enrollment.personName || 'این فرد'
+    if (!window.confirm(`ثبت چهره «${label}» حذف شود؟`)) return
+    setRowBusyId(enrollment.id)
+    onError(null)
+    try {
+      const qs = new URLSearchParams({
+        projectId,
+        enrollmentId: enrollment.id,
+      })
+      const res = await fetch(`/api/attendance/enrollments?${qs.toString()}`, {
+        method: 'DELETE',
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'حذف ناموفق')
+      if (enrollUserId === enrollment.userId) setEnrollUserId('')
+      if (editingId === enrollment.id) setEditingId(null)
+      setStatusText(`ثبت چهره «${label}» حذف شد`)
+      await loadEnrollments()
+      onEnrolled?.()
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'حذف ناموفق')
+    } finally {
+      setRowBusyId(null)
     }
   }
 
@@ -438,8 +561,9 @@ export function GateCameraPanel({
         else if (j.email?.configured) setEmailHint('سرویس ایمیل آماده است')
       })
       .catch(() => undefined)
-    // Warm up MediaPipe so first recognize isn't delayed
+    // Warm detectors + FaceNet so first enroll/recognize is not delayed
     void import('@/lib/attendance/face-detect').then((m) => m.getFaceDetector())
+    void warmFaceEmbedder().catch(() => undefined)
     return () => stopPreview()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
@@ -452,8 +576,8 @@ export function GateCameraPanel({
 
   return (
     <SectionCard
-      title="دوربین گیت — پایش خودکار"
-      description="دوربین را وصل کنید، چهره را یک‌بار ثبت کنید، پایش را روشن کنید؛ تردد خودش ثبت می‌شود"
+      title="دوربین گیت — شناسایی بیومتریک"
+      description="ثبت چندنمونه‌ای FaceNet، تطبیق ۱:N با آستانه و حاشیه ابهام — بدون حدس LLM"
     >
       <div className="space-y-4">
         {emailHint ? (
@@ -580,6 +704,15 @@ export function GateCameraPanel({
             <Camera className="h-4 w-4 ml-1" />
             اتصال به این گیت
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-slate-300 text-slate-800"
+            onClick={() => setMethodOpen(true)}
+          >
+            <Info className="h-4 w-4 ml-1" />
+            Recognition Method
+          </Button>
           {!watching ? (
             <Button
               type="button"
@@ -600,16 +733,18 @@ export function GateCameraPanel({
 
         <div className="border-t pt-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <Label className="text-base">شناسایی اولیه (یک‌بار برای هر نفر)</Label>
-            <Badge variant="outline">{enrollments.length} نفر ثبت‌شده</Badge>
+            <Label className="text-base">ثبت بیومتریک (۵ نمونه برای هر نفر)</Label>
+            <Badge variant="outline">
+              {enrollments.filter((e) => e.hasEmbedding).length}/{enrollments.length} بیومتریک
+            </Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            فقط یک‌بار لازم است. بعد از آن پایش خودکار خودش عکس می‌گیرد و ثبت می‌کند.
+            هنگام ثبت، کمی سر را چپ/راست کنید. سیستم میانگین بردار FaceNet را ذخیره می‌کند و هنگام تردد با فاصله اقلیدسی + حاشیه ابهام تطبیق می‌دهد.
           </p>
           <Input
             value={memberQuery}
             onChange={(e) => setMemberQuery(e.target.value)}
-            placeholder="جستجوی نام برای شناسایی اولیه..."
+            placeholder="جستجوی نام برای ثبت بیومتریک..."
           />
           <Select value={enrollUserId || undefined} onValueChange={setEnrollUserId}>
             <SelectTrigger>
@@ -617,11 +752,11 @@ export function GateCameraPanel({
             </SelectTrigger>
             <SelectContent>
               {filteredMembers.map((m) => {
-                const enrolled = enrollments.some((e) => e.userId === m.userId)
+                const enrolled = enrollments.find((e) => e.userId === m.userId)
                 return (
                   <SelectItem key={m.userId} value={m.userId}>
                     {m.fullName}
-                    {enrolled ? ' ✓' : ''}
+                    {enrolled?.hasEmbedding ? ' ✓' : enrolled ? ' (نیاز به ثبت مجدد)' : ''}
                   </SelectItem>
                 )
               })}
@@ -634,29 +769,126 @@ export function GateCameraPanel({
             onClick={() => void enrollFromCamera()}
           >
             <UserPlus className="h-4 w-4 ml-1" />
-            ثبت شناسایی اولیه از دوربین
+            {enrollments.some((e) => e.userId === enrollUserId)
+              ? 'ثبت مجدد بیومتریک از دوربین'
+              : 'ثبت بیومتریک از دوربین'}
           </Button>
 
           {enrollments.length > 0 ? (
-            <ul className="grid gap-2 sm:grid-cols-2 max-h-40 overflow-y-auto">
-              {enrollments.map((e) => (
-                <li
-                  key={e.id}
-                  className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm"
-                >
-                  {e.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={e.imageUrl}
-                      alt={e.personName || ''}
-                      className="h-10 w-10 rounded object-cover"
-                    />
-                  ) : (
-                    <div className="h-10 w-10 rounded bg-muted" />
-                  )}
-                  <span className="truncate font-medium">{e.personName || e.userId}</span>
-                </li>
-              ))}
+            <ul className="grid gap-2 sm:grid-cols-2 max-h-64 overflow-y-auto">
+              {enrollments.map((e) => {
+                const rowBusy = rowBusyId === e.id
+                const isEditing = editingId === e.id
+                return (
+                  <li
+                    key={e.id}
+                    className="rounded-md border px-2 py-2 text-sm space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      {e.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={e.imageUrl}
+                          alt={e.personName || ''}
+                          className="h-10 w-10 rounded object-cover shrink-0"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded bg-muted shrink-0" />
+                      )}
+                      {isEditing ? (
+                        <Input
+                          value={editName}
+                          onChange={(ev) => setEditName(ev.target.value)}
+                          className="h-8 text-sm"
+                          disabled={rowBusy}
+                          autoFocus
+                        />
+                      ) : (
+                        <span className="truncate font-medium flex-1">
+                          {e.personName || e.userId}
+                          {!e.hasEmbedding ? (
+                            <span className="ms-1 text-[10px] font-normal text-amber-700">
+                              نیاز به ثبت مجدد
+                            </span>
+                          ) : (
+                            <span className="ms-1 text-[10px] font-normal text-emerald-700">
+                              {e.sampleCount ?? 1} نمونه
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 justify-end">
+                      {isEditing ? (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={rowBusy || !editName.trim()}
+                            onClick={() => void saveEnrollmentName(e.id)}
+                          >
+                            {rowBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'ذخیره'}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs"
+                            disabled={rowBusy}
+                            onClick={() => setEditingId(null)}
+                          >
+                            انصراف
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                            disabled={busy || rowBusy || watching}
+                            onClick={() => startRename(e)}
+                            title="ویرایش نام"
+                          >
+                            <Pencil className="h-3.5 w-3.5 ml-1" />
+                            نام
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                            disabled={busy || rowBusy || watching || !previewOn}
+                            onClick={() => startReEnroll(e)}
+                            title="ثبت مجدد چهره از دوربین"
+                          >
+                            <Camera className="h-3.5 w-3.5 ml-1" />
+                            چهره
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            className="h-7 px-2 text-xs"
+                            disabled={busy || rowBusy || watching}
+                            onClick={() => void removeEnrollment(e)}
+                            title="حذف ثبت چهره"
+                          >
+                            {rowBusy ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3.5 w-3.5 ml-1" />
+                            )}
+                            حذف
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           ) : null}
         </div>
@@ -665,6 +897,8 @@ export function GateCameraPanel({
           <p className="text-sm rounded-md border bg-muted/40 px-3 py-2">{statusText}</p>
         ) : null}
       </div>
+
+      <FaceRecognitionMethodModal open={methodOpen} onClose={() => setMethodOpen(false)} />
     </SectionCard>
   )
 }

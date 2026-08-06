@@ -18,12 +18,15 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { APP_TAGLINE } from '@/lib/brand'
+import { useLocale } from '@/components/i18n/locale-provider'
 
 export function AdminDashboard() {
   const { feeds, stats, members, loading, error, openDetail } = useControlCenterDetails()
+  const { locale } = useLocale()
+  const fa = locale === 'fa'
 
-  if (loading) return <LoadingBlock label="Loading control center..." />
-  if (error || !stats) return <ErrorBlock message={error ?? 'Unable to load dashboard'} />
+  if (loading) return <LoadingBlock label={fa ? 'در حال بارگذاری کنترل سنتر...' : 'Loading control center...'} />
+  if (error || !stats) return <ErrorBlock message={error ?? (fa ? 'بارگذاری داشبورد ممکن نشد' : 'Unable to load dashboard')} />
 
   const pendingPassword = members.filter((m) => !m.password_changed_by_member).length
   const activeMembers = members.filter((m) => m.is_active).length
@@ -82,7 +85,9 @@ export function AdminDashboard() {
 
       {!openDetail ? (
         <p className="hidden lg:block text-sm text-muted-foreground text-center py-12">
-          از منوی راست یک آیتم را انتخاب کنید تا اینجا باز شود.
+          {fa
+            ? 'از منوی راست یک آیتم را انتخاب کنید تا اینجا باز شود.'
+            : 'Select an item from the sidebar to open it here.'}
         </p>
       ) : null}
     </div>
@@ -91,15 +96,17 @@ export function AdminDashboard() {
 
 function ControlCenterExpandedPanel() {
   const { feeds, stats, members, openDetail } = useControlCenterDetails()
+  const { locale } = useLocale()
   if (!openDetail || !stats) return null
 
+  const fa = locale === 'fa'
   const titles: Record<DetailKey, string> = {
-    messages: 'Support & Messages',
-    alerts: 'Critical Alerts',
-    roles: 'Access by Role',
-    dashboards: 'داشبورد اعضا',
-    activity: 'Recent Activity',
-    presence: 'Site Presence',
+    messages: fa ? 'پشتیبانی و پیام‌ها' : 'Support & Messages',
+    alerts: fa ? 'هشدارهای حیاتی' : 'Critical Alerts',
+    roles: fa ? 'دسترسی بر اساس نقش' : 'Access by Role',
+    dashboards: fa ? 'داشبورد اعضا' : 'Member Dashboards',
+    activity: fa ? 'فعالیت اخیر' : 'Recent Activity',
+    presence: fa ? 'حضور در سایت' : 'Site Presence',
   }
 
   return (
@@ -108,10 +115,12 @@ function ControlCenterExpandedPanel() {
         <h2 className="text-base font-semibold tracking-tight">{titles[openDetail]}</h2>
         {openDetail === 'dashboards' ? (
           <p className="text-xs text-muted-foreground mt-0.5">
-            اعضای تعریف‌شده و خلاصه وظایف
+            {fa ? 'اعضای تعریف‌شده و خلاصه وظایف' : 'Defined members and duty summaries'}
           </p>
         ) : (
-          <p className="text-xs text-muted-foreground mt-0.5">Live data — full view</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {fa ? 'داده زنده — نمای کامل' : 'Live data — full view'}
+          </p>
         )}
       </div>
       <div className="p-5 max-h-[min(78vh,720px)] overflow-y-auto">

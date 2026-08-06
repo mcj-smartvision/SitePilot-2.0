@@ -29,6 +29,7 @@ import type {
 import { CallOverlay, IncomingCallBanner, createOutgoingCall } from '@/components/messaging/messenger-call'
 import { VoiceVideoRecorder } from '@/components/messaging/media-recorder'
 import { cn } from '@/lib/utils'
+import { useLocale } from '@/components/i18n/locale-provider'
 
 function chatTitle(c: MessengerConversation | null | undefined) {
   if (!c) return 'گفتگو'
@@ -58,6 +59,9 @@ export function MessengerButton({
   variant?: 'default' | 'nav'
   className?: string
 }) {
+  const { locale } = useLocale()
+  const fa = locale === 'fa'
+  const messengerLabel = fa ? 'پیام‌رسان' : 'Messenger'
   const [open, setOpen] = useState(false)
   const [projectId, setProjectId] = useState<string | null>(null)
   const [unread, setUnread] = useState(0)
@@ -163,10 +167,10 @@ export function MessengerButton({
               ),
           className
         )}
-        title="پیام‌رسان"
+        title={messengerLabel}
       >
         <MessageCircle className={cn('h-4 w-4 shrink-0', pulse && variant !== 'nav' && 'animate-bounce')} />
-        <span className={cn(variant === 'nav' ? 'flex-1 text-start' : 'hidden sm:inline')}>پیام‌رسان</span>
+        <span className={cn(variant === 'nav' ? 'flex-1 text-start' : 'hidden sm:inline')}>{messengerLabel}</span>
         {unread > 0 && (
           <span
             className={cn(

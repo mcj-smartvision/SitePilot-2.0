@@ -17,11 +17,17 @@ export async function POST(request: NextRequest) {
     const result = await recognizeAndRecord(supabase, {
       projectId: String(body.projectId ?? body.project_id ?? ''),
       gateId: body.gateId ?? body.gate_id ?? null,
+      embeddings: Array.isArray(body.embeddings)
+        ? body.embeddings.map((e: unknown) =>
+            Array.isArray(e) ? e.map((n: unknown) => Number(n)) : []
+          )
+        : undefined,
       imageBase64: body.imageBase64 ?? body.image_base64 ?? undefined,
       faces,
       mimeType: body.mimeType ?? body.mime_type ?? 'image/jpeg',
       minConfidence:
-        body.minConfidence != null ? Number(body.minConfidence) : 0.6,
+        body.minConfidence != null ? Number(body.minConfidence) : undefined,
+      maxDistance: body.maxDistance != null ? Number(body.maxDistance) : undefined,
       recordFailed: auto ? false : body.recordFailed !== false,
     })
     return NextResponse.json(result)

@@ -25,6 +25,10 @@ export interface AttendanceEnrollment {
   isActive: boolean
   createdAt: string
   imageUrl?: string | null
+  /** True when a biometric FaceNet embedding is stored */
+  hasEmbedding?: boolean
+  sampleCount?: number
+  embeddingModel?: string | null
 }
 
 export interface AttendanceTransit {
@@ -110,7 +114,11 @@ export interface EnrollPersonInput {
   projectId: string
   userId: string
   personName?: string | null
-  /** JPEG/PNG bytes as base64 (no data: prefix) */
+  /** JPEG/PNG bytes as base64 (no data: prefix) — preview / audit image */
   imageBase64: string
   mimeType?: string
+  /** L2-normalized FaceNet 128-d descriptor from the browser */
+  faceEmbedding: number[]
+  embeddingModel?: string
+  sampleCount?: number
 }

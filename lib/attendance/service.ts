@@ -18,6 +18,12 @@ import {
   nextDirection,
   startOfLocalDayIso,
 } from './domain'
+import {
+  FACE_EMBEDDING_MODEL,
+  FACE_MATCH_MAX_DISTANCE,
+  isValidEmbedding,
+  matchEmbedding,
+} from './face-match'
 import type {
   AttendanceDashboardSnapshot,
   AttendanceEnrollment,
@@ -194,6 +200,7 @@ function mapEnrollment(
   row: Record<string, unknown>,
   imageUrl: string | null = null
 ): AttendanceEnrollment {
+  const embedding = row.face_embedding
   return {
     id: String(row.id),
     projectId: String(row.project_id),
@@ -204,6 +211,9 @@ function mapEnrollment(
     isActive: Boolean(row.is_active),
     createdAt: String(row.created_at),
     imageUrl,
+    hasEmbedding: isValidEmbedding(embedding),
+    sampleCount: Number(row.sample_count ?? 1),
+    embeddingModel: (row.embedding_model as string) ?? null,
   }
 }
 
@@ -256,6 +266,20 @@ export async function enrollPerson(supabase: SupabaseClient, input: EnrollPerson
   const member = members.find((m) => m.userId === input.userId)
   if (!member) throw new AttendanceError('VALIDATION', 'فرد عضو فعال پروژه نیست')
 
+  if (!isValidEmbedding(input.faceEmbedding)) {
+    throw new AttendanceError(
+      'VALIDATION',
+      'بردار بیومتریک چهره نامعتبر است — دوباره روبه‌روی دوربین ثبت کنید'
+    )
+  }
+
+  const { data: previous } = await supabase
+    .from('attendance_enrollments')
+    .select('image_path')
+    .eq('project_id', input.projectId)
+    .eq('user_id', input.userId)
+    .maybeSingle()
+
   const { buffer, ext, mimeType } = decodeBase64Image(
     input.imageBase64,
     input.mimeType || 'image/jpeg'
@@ -268,6 +292,8 @@ export async function enrollPerson(supabase: SupabaseClient, input: EnrollPerson
   if (uploadError) throw new AttendanceError('VALIDATION', uploadError.message)
 
   const personName = input.personName?.trim() || member.fullName
+  const sampleCount = Math.max(1, Number(input.sampleCount ?? 1))
+  const embeddingModel = input.embeddingModel?.trim() || FACE_EMBEDDING_MODEL
 
   const { data, error } = await supabase
     .from('attendance_enrollments')
@@ -279,6 +305,9 @@ export async function enrollPerson(supabase: SupabaseClient, input: EnrollPerson
         person_name: personName,
         enrolled_by: user.id,
         is_active: true,
+        face_embedding: input.faceEmbedding,
+        embedding_model: embeddingModel,
+        sample_count: sampleCount,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'project_id,user_id' }
@@ -287,104 +316,97 @@ export async function enrollPerson(supabase: SupabaseClient, input: EnrollPerson
     .single()
 
   if (error) throw new AttendanceError('VALIDATION', error.message)
+
+  const oldPath = previous?.image_path as string | undefined
+  if (oldPath && oldPath !== path) {
+    await supabase.storage.from('attendance-faces').remove([oldPath]).catch(() => undefined)
+  }
+
   const url = await signedFaceUrl(supabase, path)
   return mapEnrollment(data as Record<string, unknown>, url)
 }
 
-type VisionMatch = { userId: string | null; confidence: number; reason: string }
+/** Soft-delete enrollment and remove face image from storage when possible. */
+export async function deleteEnrollment(
+  supabase: SupabaseClient,
+  projectId: string,
+  enrollmentId: string
+) {
+  const user = await requireUser(supabase)
+  await assertProjectAccess(supabase, user.id, projectId)
+  await assertCanWrite(supabase, user.id, projectId)
 
-async function matchFaceWithVision(
-  liveDataUrl: string,
-  gallery: Array<{ userId: string; personName: string; imageUrl: string; personnelCode?: string | null }>
-): Promise<VisionMatch> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
-  if (!apiKey) {
-    throw new AttendanceError(
-      'VALIDATION',
-      'شناسایی چهره نیاز به OPENAI_API_KEY دارد'
-    )
-  }
-  if (gallery.length === 0) {
-    return { userId: null, confidence: 0, reason: 'no_enrollments' }
-  }
+  const { data: existing, error: fetchError } = await supabase
+    .from('attendance_enrollments')
+    .select('*')
+    .eq('id', enrollmentId)
+    .eq('project_id', projectId)
+    .maybeSingle()
 
-  // Keep gallery small + low detail for gate latency (target ~2–4s, not 15–20s)
-  const refs = gallery.slice(0, 8)
-  const content: Array<Record<string, unknown>> = [
-    {
-      type: 'text',
-      text:
-        'Gate face match. LIVE is a face crop. Pick the same person from references. ' +
-        'Ignore background/hat/lighting. JSON only: {"userId":"<uuid|null>","confidence":0-1,"reason":"short"}. ' +
-        'userId only if confidence>=0.6.\n' +
-        refs
-          .map(
-            (g, i) =>
-              `${i + 1}. userId=${g.userId} name=${g.personName}${g.personnelCode ? ` code=${g.personnelCode}` : ''}`
-          )
-          .join('\n'),
-    },
-    { type: 'image_url', image_url: { url: liveDataUrl, detail: 'low' } },
-  ]
+  if (fetchError) throw new AttendanceError('VALIDATION', fetchError.message)
+  if (!existing) throw new AttendanceError('NOT_FOUND', 'ثبت چهره پیدا نشد')
 
-  for (const g of refs) {
-    content.push({
-      type: 'text',
-      text: `Ref ${g.personName} (${g.userId}):`,
-    })
-    content.push({
-      type: 'image_url',
-      image_url: { url: g.imageUrl, detail: 'low' },
-    })
+  const { error } = await supabase
+    .from('attendance_enrollments')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('id', enrollmentId)
+    .eq('project_id', projectId)
+
+  if (error) throw new AttendanceError('VALIDATION', error.message)
+
+  const imagePath = existing.image_path as string | null
+  if (imagePath) {
+    await supabase.storage.from('attendance-faces').remove([imagePath]).catch(() => undefined)
   }
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      temperature: 0,
-      max_tokens: 80,
-      response_format: { type: 'json_object' },
-      messages: [{ role: 'user', content }],
-    }),
-  })
-
-  const body = (await res.json().catch(() => ({}))) as {
-    choices?: Array<{ message?: { content?: string } }>
-    error?: { message?: string }
-  }
-  if (!res.ok) {
-    throw new AttendanceError('VALIDATION', body.error?.message || `Vision HTTP ${res.status}`)
-  }
-
-  const raw = body.choices?.[0]?.message?.content || '{}'
-  let parsed: { userId?: string | null; confidence?: number; reason?: string }
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    return { userId: null, confidence: 0, reason: 'parse_error' }
-  }
-
-  const userId = parsed.userId && gallery.some((g) => g.userId === parsed.userId) ? parsed.userId : null
-  const confidence = Math.max(0, Math.min(1, Number(parsed.confidence ?? 0)))
-  return { userId, confidence, reason: parsed.reason || '' }
+  return { ok: true as const, id: enrollmentId }
 }
 
-/** Capture-based identify: one or many face crops → match + record. */
+/** Update display name for an enrollment (without changing the face image). */
+export async function updateEnrollment(
+  supabase: SupabaseClient,
+  input: { projectId: string; enrollmentId: string; personName: string }
+) {
+  const user = await requireUser(supabase)
+  await assertProjectAccess(supabase, user.id, input.projectId)
+  await assertCanWrite(supabase, user.id, input.projectId)
+
+  const name = input.personName.trim()
+  if (!name) throw new AttendanceError('VALIDATION', 'نام را وارد کنید')
+
+  const { data, error } = await supabase
+    .from('attendance_enrollments')
+    .update({
+      person_name: name,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', input.enrollmentId)
+    .eq('project_id', input.projectId)
+    .eq('is_active', true)
+    .select('*')
+    .maybeSingle()
+
+  if (error) throw new AttendanceError('VALIDATION', error.message)
+  if (!data) throw new AttendanceError('NOT_FOUND', 'ثبت چهره پیدا نشد')
+
+  const url = await signedFaceUrl(supabase, String(data.image_path))
+  return mapEnrollment(data as Record<string, unknown>, url)
+}
+
+/** Capture-based identify: FaceNet embeddings → 1:N match + record. */
 export async function recognizeAndRecord(
   supabase: SupabaseClient,
   input: {
     projectId: string
     gateId?: string | null
+    /** Preferred: one embedding per detected face (browser FaceNet) */
+    embeddings?: number[][]
+    /** Legacy image crops — ignored for matching when embeddings present */
     imageBase64?: string
-    /** Multiple face crops from client detector (preferred) */
     faces?: string[]
     mimeType?: string
     minConfidence?: number
+    maxDistance?: number
     recordFailed?: boolean
   }
 ) {
@@ -400,35 +422,51 @@ export async function recognizeAndRecord(
     )
   }
 
-  const members = await loadActiveMembers(supabase, input.projectId)
-  const codeByUser = new Map(members.map((m) => [m.userId, m.personnelCode]))
+  const { data: enrollmentRows, error: embError } = await supabase
+    .from('attendance_enrollments')
+    .select('user_id, person_name, face_embedding')
+    .eq('project_id', input.projectId)
+    .eq('is_active', true)
 
-  const gallery = enrollments
-    .filter((e) => e.imageUrl)
-    .map((e) => ({
-      userId: e.userId,
-      personName: e.personName || 'بدون نام',
-      imageUrl: e.imageUrl!,
-      personnelCode: codeByUser.get(e.userId) ?? null,
+  if (embError) throw new AttendanceError('VALIDATION', embError.message)
+
+  const gallery = (enrollmentRows ?? [])
+    .filter((r) => isValidEmbedding(r.face_embedding))
+    .map((r) => ({
+      userId: String(r.user_id),
+      personName: String(r.person_name || 'بدون نام'),
+      embedding: r.face_embedding as number[],
     }))
 
-  const facePayloads =
-    input.faces && input.faces.length > 0
-      ? input.faces
-      : input.imageBase64
-        ? [input.imageBase64]
-        : []
-
-  if (facePayloads.length === 0) {
-    throw new AttendanceError('VALIDATION', 'تصویر چهره ارسال نشده است')
+  if (gallery.length === 0) {
+    throw new AttendanceError(
+      'VALIDATION',
+      'ثبت‌های قبلی فقط تصویر دارند. همه افراد را دوباره با «ثبت بیومتریک» ثبت کنید.'
+    )
   }
 
-  const minConfidence = input.minConfidence ?? 0.6
+  const liveEmbeddings =
+    input.embeddings && input.embeddings.length > 0
+      ? input.embeddings.filter(isValidEmbedding)
+      : []
+
+  if (liveEmbeddings.length === 0) {
+    throw new AttendanceError(
+      'VALIDATION',
+      'بردار بیومتریک چهره ارسال نشده — مدل شناسایی را صبر کنید تا بارگذاری شود'
+    )
+  }
+
+  const maxDistance = input.maxDistance ?? FACE_MATCH_MAX_DISTANCE
+  // Confidence is derived from distance; keep a soft floor for UI/API compatibility
+  const minConfidence = input.minConfidence ?? 0.62
   const recordFailed = input.recordFailed !== false
   const results: Array<{
     matched: boolean
     confidence: number
     reason: string
+    distance?: number
+    margin?: number
     transit: AttendanceTransit | null
     enrollment: AttendanceEnrollment | null
     duplicate?: boolean
@@ -436,19 +474,13 @@ export async function recognizeAndRecord(
   }> = []
 
   const matchedUserIds = new Set<string>()
-  // Auto/gate path: match largest faces first; cap at 2 to keep latency low
-  const facesToMatch = facePayloads.slice(0, 2)
+  const facesToMatch = liveEmbeddings.slice(0, 3)
 
-  for (const face of facesToMatch) {
-    const { mimeType } = decodeBase64Image(face, input.mimeType || 'image/jpeg')
-    const liveDataUrl = face.startsWith('data:')
-      ? face
-      : `data:${mimeType};base64,${face}`
-
-    const match = await matchFaceWithVision(liveDataUrl, gallery)
+  for (const live of facesToMatch) {
+    const match = matchEmbedding(live, gallery, { maxDistance })
 
     if (!match.userId || match.confidence < minConfidence) {
-      if (recordFailed && facePayloads.length === 1) {
+      if (recordFailed && facesToMatch.length === 1) {
         const failed = await recordTransit(supabase, {
           projectId: input.projectId,
           gateId: input.gateId,
@@ -456,12 +488,14 @@ export async function recognizeAndRecord(
           personName: null,
           source: 'camera',
           identificationStatus: 'failed',
-          notes: `شناسایی ناموفق (confidence=${match.confidence.toFixed(2)}) ${match.reason}`,
+          notes: `شناسایی ناموفق (${match.reason})`,
         })
         results.push({
           matched: false,
           confidence: match.confidence,
           reason: match.reason,
+          distance: match.distance,
+          margin: match.margin,
           transit: failed,
           enrollment: null,
         })
@@ -470,6 +504,8 @@ export async function recognizeAndRecord(
           matched: false,
           confidence: match.confidence,
           reason: match.reason,
+          distance: match.distance,
+          margin: match.margin,
           transit: null,
           enrollment: null,
         })
@@ -482,6 +518,8 @@ export async function recognizeAndRecord(
         matched: true,
         confidence: match.confidence,
         reason: 'already_matched_in_frame',
+        distance: match.distance,
+        margin: match.margin,
         transit: null,
         enrollment: enrollments.find((e) => e.userId === match.userId) ?? null,
         duplicate: true,
@@ -509,6 +547,8 @@ export async function recognizeAndRecord(
         matched: true,
         confidence: match.confidence,
         reason: 'duplicate_within_cooldown',
+        distance: match.distance,
+        margin: match.margin,
         transit: mapTransit(recent as Record<string, unknown>),
         enrollment,
         duplicate: true,
@@ -524,13 +564,15 @@ export async function recognizeAndRecord(
       personName: enrollment?.personName,
       source: 'camera',
       identificationStatus: 'success',
-      notes: `شناسایی دوربین confidence=${match.confidence.toFixed(2)}`,
+      notes: `biometric FaceNet ${match.reason}`,
     })
 
     results.push({
       matched: true,
       confidence: match.confidence,
       reason: match.reason,
+      distance: match.distance,
+      margin: match.margin,
       transit,
       enrollment,
       duplicate: false,
@@ -547,12 +589,15 @@ export async function recognizeAndRecord(
     matched: Boolean(primary?.matched && primary.transit),
     confidence: primary?.confidence ?? 0,
     reason: primary?.reason ?? '',
+    distance: primary?.distance,
+    margin: primary?.margin,
     transit: primary?.transit ?? null,
     enrollment: primary?.enrollment ?? null,
     duplicate: Boolean(primary?.duplicate),
     results,
-    faceCount: facePayloads.length,
+    faceCount: facesToMatch.length,
     matchedCount: results.filter((r) => r.matched && r.transit && !r.duplicate).length,
+    engine: FACE_EMBEDDING_MODEL,
   }
 }
 
