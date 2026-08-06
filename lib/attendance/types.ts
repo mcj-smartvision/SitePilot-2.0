@@ -15,6 +15,14 @@ export interface AttendanceGate {
   sortOrder: number
 }
 
+export interface AttendanceEnrollmentSample {
+  id: string
+  pose: string
+  labelFa: string
+  labelEn: string
+  imageUrl: string | null
+}
+
 export interface AttendanceEnrollment {
   id: string
   projectId: string
@@ -29,6 +37,7 @@ export interface AttendanceEnrollment {
   hasEmbedding?: boolean
   sampleCount?: number
   embeddingModel?: string | null
+  samples?: AttendanceEnrollmentSample[]
 }
 
 export interface AttendanceTransit {
@@ -114,11 +123,20 @@ export interface EnrollPersonInput {
   projectId: string
   userId: string
   personName?: string | null
-  /** JPEG/PNG bytes as base64 (no data: prefix) — preview / audit image */
-  imageBase64: string
+  /**
+   * Guided multi-pose samples (preferred).
+   * Server averages embeddings and stores each crop.
+   */
+  samples?: Array<{
+    imageBase64: string
+    faceEmbedding: number[]
+    pose: string
+    mimeType?: string
+  }>
+  /** Legacy single-image enroll */
+  imageBase64?: string
   mimeType?: string
-  /** L2-normalized FaceNet 128-d descriptor from the browser */
-  faceEmbedding: number[]
+  faceEmbedding?: number[]
   embeddingModel?: string
   sampleCount?: number
 }

@@ -21,12 +21,15 @@ import {
 import {
   FACE_EMBEDDING_MODEL,
   FACE_MATCH_MAX_DISTANCE,
+  averageEmbeddings,
   isValidEmbedding,
   matchEmbedding,
 } from './face-match'
+import { poseLabel } from './enroll-poses'
 import type {
   AttendanceDashboardSnapshot,
   AttendanceEnrollment,
+  AttendanceEnrollmentSample,
   AttendanceGate,
   AttendanceTransit,
   BindGateCameraInput,
@@ -196,24 +199,67 @@ export async function bindGateCamera(supabase: SupabaseClient, input: BindGateCa
   return mapGate(data as Record<string, unknown>)
 }
 
-function mapEnrollment(
+type StoredSampleRow = {
+  id: string
+  path: string
+  pose: string
+  embedding: number[]
+}
+
+function parseStoredSamples(raw: unknown): StoredSampleRow[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = String(row.id ?? '')
+      const path = String(row.path ?? '')
+      const pose = String(row.pose ?? 'straight')
+      const embedding = Array.isArray(row.embedding)
+        ? row.embedding.map((n) => Number(n))
+        : []
+      if (!id || !path || !isValidEmbedding(embedding)) return null
+      return { id, path, pose, embedding }
+    })
+    .filter((s): s is StoredSampleRow => Boolean(s))
+}
+
+async function mapEnrollment(
+  supabase: SupabaseClient,
   row: Record<string, unknown>,
   imageUrl: string | null = null
-): AttendanceEnrollment {
+): Promise<AttendanceEnrollment> {
   const embedding = row.face_embedding
+  const stored = parseStoredSamples(row.sample_images)
+  const samples: AttendanceEnrollmentSample[] = await Promise.all(
+    stored.map(async (s) => ({
+      id: s.id,
+      pose: s.pose,
+      labelFa: poseLabel(s.pose, true),
+      labelEn: poseLabel(s.pose, false),
+      imageUrl: await signedFaceUrl(supabase, s.path),
+    }))
+  )
+
+  const primaryUrl =
+    imageUrl ??
+    samples[0]?.imageUrl ??
+    (row.image_path ? await signedFaceUrl(supabase, String(row.image_path)) : null)
+
   return {
     id: String(row.id),
     projectId: String(row.project_id),
     userId: String(row.user_id),
-    imagePath: String(row.image_path),
+    imagePath: String(row.image_path ?? stored[0]?.path ?? ''),
     personName: (row.person_name as string) ?? null,
     enrolledBy: (row.enrolled_by as string) ?? null,
     isActive: Boolean(row.is_active),
     createdAt: String(row.created_at),
-    imageUrl,
+    imageUrl: primaryUrl,
     hasEmbedding: isValidEmbedding(embedding),
-    sampleCount: Number(row.sample_count ?? 1),
+    sampleCount: Number(row.sample_count ?? stored.length ?? 1),
     embeddingModel: (row.embedding_model as string) ?? null,
+    samples,
   }
 }
 
@@ -241,10 +287,7 @@ export async function listEnrollments(supabase: SupabaseClient, projectId: strin
 
   const rows = data ?? []
   return Promise.all(
-    rows.map(async (r) => {
-      const url = await signedFaceUrl(supabase, String(r.image_path))
-      return mapEnrollment(r as Record<string, unknown>, url)
-    })
+    rows.map(async (r) => mapEnrollment(supabase, r as Record<string, unknown>))
   )
 }
 
@@ -266,33 +309,87 @@ export async function enrollPerson(supabase: SupabaseClient, input: EnrollPerson
   const member = members.find((m) => m.userId === input.userId)
   if (!member) throw new AttendanceError('VALIDATION', 'فرد عضو فعال پروژه نیست')
 
-  if (!isValidEmbedding(input.faceEmbedding)) {
+  const guidedSamples = Array.isArray(input.samples) ? input.samples : []
+  const legacyEmbedding = input.faceEmbedding
+  const legacyImage = input.imageBase64
+
+  type PreparedSample = {
+    pose: string
+    embedding: number[]
+    buffer: Buffer
+    ext: string
+    mimeType: string
+  }
+
+  const prepared: PreparedSample[] = []
+
+  if (guidedSamples.length > 0) {
+    if (guidedSamples.length < 3) {
+      throw new AttendanceError('VALIDATION', 'حداقل ۳ زاویه از چهره لازم است')
+    }
+    for (const sample of guidedSamples) {
+      if (!isValidEmbedding(sample.faceEmbedding)) {
+        throw new AttendanceError('VALIDATION', 'بردار بیومتریک یکی از نمونه‌ها نامعتبر است')
+      }
+      const decoded = decodeBase64Image(
+        sample.imageBase64,
+        sample.mimeType || input.mimeType || 'image/jpeg'
+      )
+      prepared.push({
+        pose: String(sample.pose || 'straight'),
+        embedding: sample.faceEmbedding,
+        buffer: decoded.buffer,
+        ext: decoded.ext,
+        mimeType: decoded.mimeType,
+      })
+    }
+  } else if (legacyImage && isValidEmbedding(legacyEmbedding)) {
+    const decoded = decodeBase64Image(legacyImage, input.mimeType || 'image/jpeg')
+    prepared.push({
+      pose: 'straight',
+      embedding: legacyEmbedding,
+      buffer: decoded.buffer,
+      ext: decoded.ext,
+      mimeType: decoded.mimeType,
+    })
+  } else {
     throw new AttendanceError(
       'VALIDATION',
-      'بردار بیومتریک چهره نامعتبر است — دوباره روبه‌روی دوربین ثبت کنید'
+      'نمونه‌های بیومتریک ارسال نشده — از صفحه ثبت هدایت‌شده استفاده کنید'
     )
   }
 
   const { data: previous } = await supabase
     .from('attendance_enrollments')
-    .select('image_path')
+    .select('image_path, sample_images')
     .eq('project_id', input.projectId)
     .eq('user_id', input.userId)
     .maybeSingle()
 
-  const { buffer, ext, mimeType } = decodeBase64Image(
-    input.imageBase64,
-    input.mimeType || 'image/jpeg'
-  )
-  const path = `${input.projectId}/${input.userId}-${Date.now()}.${ext}`
+  const oldPaths = new Set<string>()
+  if (previous?.image_path) oldPaths.add(String(previous.image_path))
+  for (const s of parseStoredSamples(previous?.sample_images)) oldPaths.add(s.path)
 
-  const { error: uploadError } = await supabase.storage
-    .from('attendance-faces')
-    .upload(path, buffer, { contentType: mimeType, upsert: true })
-  if (uploadError) throw new AttendanceError('VALIDATION', uploadError.message)
+  const stamp = Date.now()
+  const storedSamples: StoredSampleRow[] = []
+  for (let i = 0; i < prepared.length; i++) {
+    const sample = prepared[i]
+    const path = `${input.projectId}/${input.userId}-${stamp}-${i}-${sample.pose}.${sample.ext}`
+    const { error: uploadError } = await supabase.storage
+      .from('attendance-faces')
+      .upload(path, sample.buffer, { contentType: sample.mimeType, upsert: true })
+    if (uploadError) throw new AttendanceError('VALIDATION', uploadError.message)
+    storedSamples.push({
+      id: crypto.randomUUID(),
+      path,
+      pose: sample.pose,
+      embedding: sample.embedding,
+    })
+  }
 
+  const faceEmbedding = averageEmbeddings(storedSamples.map((s) => s.embedding))
+  const primaryPath = storedSamples[0].path
   const personName = input.personName?.trim() || member.fullName
-  const sampleCount = Math.max(1, Number(input.sampleCount ?? 1))
   const embeddingModel = input.embeddingModel?.trim() || FACE_EMBEDDING_MODEL
 
   const { data, error } = await supabase
@@ -301,13 +398,14 @@ export async function enrollPerson(supabase: SupabaseClient, input: EnrollPerson
       {
         project_id: input.projectId,
         user_id: input.userId,
-        image_path: path,
+        image_path: primaryPath,
         person_name: personName,
         enrolled_by: user.id,
         is_active: true,
-        face_embedding: input.faceEmbedding,
+        face_embedding: faceEmbedding,
         embedding_model: embeddingModel,
-        sample_count: sampleCount,
+        sample_count: storedSamples.length,
+        sample_images: storedSamples,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'project_id,user_id' }
@@ -317,13 +415,13 @@ export async function enrollPerson(supabase: SupabaseClient, input: EnrollPerson
 
   if (error) throw new AttendanceError('VALIDATION', error.message)
 
-  const oldPath = previous?.image_path as string | undefined
-  if (oldPath && oldPath !== path) {
-    await supabase.storage.from('attendance-faces').remove([oldPath]).catch(() => undefined)
+  const newPaths = new Set(storedSamples.map((s) => s.path))
+  const removePaths = [...oldPaths].filter((p) => !newPaths.has(p))
+  if (removePaths.length > 0) {
+    await supabase.storage.from('attendance-faces').remove(removePaths).catch(() => undefined)
   }
 
-  const url = await signedFaceUrl(supabase, path)
-  return mapEnrollment(data as Record<string, unknown>, url)
+  return mapEnrollment(supabase, data as Record<string, unknown>)
 }
 
 /** Soft-delete enrollment and remove face image from storage when possible. */
@@ -348,18 +446,83 @@ export async function deleteEnrollment(
 
   const { error } = await supabase
     .from('attendance_enrollments')
-    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .update({
+      is_active: false,
+      sample_images: [],
+      face_embedding: null,
+      sample_count: 0,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', enrollmentId)
     .eq('project_id', projectId)
 
   if (error) throw new AttendanceError('VALIDATION', error.message)
 
-  const imagePath = existing.image_path as string | null
-  if (imagePath) {
-    await supabase.storage.from('attendance-faces').remove([imagePath]).catch(() => undefined)
+  const paths = new Set<string>()
+  if (existing.image_path) paths.add(String(existing.image_path))
+  for (const s of parseStoredSamples(existing.sample_images)) paths.add(s.path)
+  if (paths.size > 0) {
+    await supabase.storage.from('attendance-faces').remove([...paths]).catch(() => undefined)
   }
 
   return { ok: true as const, id: enrollmentId }
+}
+
+/** Delete one pose sample; re-average remaining embeddings (or deactivate if none left). */
+export async function deleteEnrollmentSample(
+  supabase: SupabaseClient,
+  input: { projectId: string; enrollmentId: string; sampleId: string }
+) {
+  const user = await requireUser(supabase)
+  await assertProjectAccess(supabase, user.id, input.projectId)
+  await assertCanWrite(supabase, user.id, input.projectId)
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('attendance_enrollments')
+    .select('*')
+    .eq('id', input.enrollmentId)
+    .eq('project_id', input.projectId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (fetchError) throw new AttendanceError('VALIDATION', fetchError.message)
+  if (!existing) throw new AttendanceError('NOT_FOUND', 'ثبت چهره پیدا نشد')
+
+  const samples = parseStoredSamples(existing.sample_images)
+  const target = samples.find((s) => s.id === input.sampleId)
+  if (!target) throw new AttendanceError('NOT_FOUND', 'نمونه عکس پیدا نشد')
+
+  const remaining = samples.filter((s) => s.id !== input.sampleId)
+
+  if (remaining.length === 0) {
+    await deleteEnrollment(supabase, input.projectId, input.enrollmentId)
+    return { ok: true as const, enrollment: null, removedSampleId: input.sampleId }
+  }
+
+  const faceEmbedding = averageEmbeddings(remaining.map((s) => s.embedding))
+  const { data, error } = await supabase
+    .from('attendance_enrollments')
+    .update({
+      sample_images: remaining,
+      sample_count: remaining.length,
+      face_embedding: faceEmbedding,
+      image_path: remaining[0].path,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', input.enrollmentId)
+    .eq('project_id', input.projectId)
+    .select('*')
+    .single()
+
+  if (error) throw new AttendanceError('VALIDATION', error.message)
+
+  await supabase.storage
+    .from('attendance-faces')
+    .remove([target.path])
+    .catch(() => undefined)
+
+  const enrollment = await mapEnrollment(supabase, data as Record<string, unknown>)
+  return { ok: true as const, enrollment, removedSampleId: input.sampleId }
 }
 
 /** Update display name for an enrollment (without changing the face image). */
@@ -389,8 +552,7 @@ export async function updateEnrollment(
   if (error) throw new AttendanceError('VALIDATION', error.message)
   if (!data) throw new AttendanceError('NOT_FOUND', 'ثبت چهره پیدا نشد')
 
-  const url = await signedFaceUrl(supabase, String(data.image_path))
-  return mapEnrollment(data as Record<string, unknown>, url)
+  return mapEnrollment(supabase, data as Record<string, unknown>)
 }
 
 /** Capture-based identify: FaceNet embeddings → 1:N match + record. */

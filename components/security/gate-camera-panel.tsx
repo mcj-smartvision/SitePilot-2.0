@@ -1,12 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Camera, Info, Loader2, Pencil, Radio, Search, Square, Trash2, UserPlus } from 'lucide-react'
+import Link from 'next/link'
+import { Camera, Info, Loader2, Radio, Search, Square, UserPlus } from 'lucide-react'
 import { SectionCard } from '@/components/admin/shared'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -15,7 +14,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  captureVideoFrame,
   listBrowserCameras,
   openCameraStream,
   stopStream,
@@ -30,7 +28,6 @@ import {
   type FaceBox,
 } from '@/lib/attendance/face-detect'
 import {
-  extractAveragedEmbedding,
   extractFaceEmbedding,
   warmFaceEmbedder,
 } from '@/lib/attendance/face-embed.client'
@@ -45,7 +42,7 @@ interface GateCameraPanelProps {
   gates: AttendanceGate[]
   selectedGateId: string
   onGateChange: (gateId: string) => void
-  members: MemberOption[]
+  members?: MemberOption[]
   onTransitRecorded: (transit: AttendanceTransit) => void
   onError: (message: string | null) => void
   onEnrolled?: () => void
@@ -55,20 +52,12 @@ interface GateCameraPanelProps {
 const WATCH_INTERVAL_MS = 900
 /** Face-box detector cadence (every-frame was too heavy) */
 const BOX_DETECT_MS = 140
-/** Multi-sample biometric enroll */
-const ENROLL_SAMPLE_COUNT = 5
-const ENROLL_SAMPLE_GAP_MS = 380
-
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => window.setTimeout(resolve, ms))
-}
 
 export function GateCameraPanel({
   projectId,
   gates,
   selectedGateId,
   onGateChange,
-  members,
   onTransitRecorded,
   onError,
   onEnrolled,
@@ -91,11 +80,6 @@ export function GateCameraPanel({
   const [watching, setWatching] = useState(false)
   const [faceCount, setFaceCount] = useState(0)
   const [enrollments, setEnrollments] = useState<AttendanceEnrollment[]>([])
-  const [enrollUserId, setEnrollUserId] = useState('')
-  const [memberQuery, setMemberQuery] = useState('')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editName, setEditName] = useState('')
-  const [rowBusyId, setRowBusyId] = useState<string | null>(null)
   const [statusText, setStatusText] = useState<string | null>(null)
   const [emailHint, setEmailHint] = useState<string | null>(null)
   const [flashName, setFlashName] = useState<string | null>(null)
@@ -105,15 +89,6 @@ export function GateCameraPanel({
 
   const selectedGate = gates.find((g) => g.id === selectedGateId) ?? null
   selectedGateIdRef.current = selectedGateId
-
-  const filteredMembers = members.filter((m) => {
-    const q = memberQuery.trim().toLowerCase()
-    if (!q) return true
-    return (
-      m.fullName.toLowerCase().includes(q) ||
-      (m.email ?? '').toLowerCase().includes(q)
-    )
-  })
 
   const loadEnrollments = useCallback(async () => {
     const res = await fetch(
@@ -410,146 +385,6 @@ export function GateCameraPanel({
     setStatusText('پایش خودکار خاموش شد')
   }
 
-  async function enrollFromCamera() {
-    if (!enrollUserId) {
-      onError('برای شناسایی اولیه، فرد را انتخاب کنید')
-      return
-    }
-    setBusy(true)
-    onError(null)
-    try {
-      const video = videoRef.current
-      if (!video) {
-        onError('دوربین آماده نیست')
-        return
-      }
-
-      setStatusText(`ثبت بیومتریک — ${ENROLL_SAMPLE_COUNT} نمونه (کمی سر را چپ/راست کنید)`)
-      await warmFaceEmbedder()
-
-      const crops: string[] = []
-      let previewCrop: string | null = null
-
-      for (let i = 0; i < ENROLL_SAMPLE_COUNT; i++) {
-        const boxes = await detectFacesInVideo(video)
-        const best = boxes[0]
-        const crop = best
-          ? cropFaceFromVideo(video, best, 0.4, 0.94)
-          : captureVideoFrame(video, 0.94)?.dataUrl ?? null
-        if (crop) {
-          crops.push(crop)
-          if (!previewCrop) previewCrop = crop
-        }
-        setStatusText(`نمونه ${i + 1}/${ENROLL_SAMPLE_COUNT}…`)
-        if (i < ENROLL_SAMPLE_COUNT - 1) await sleep(ENROLL_SAMPLE_GAP_MS)
-      }
-
-      if (crops.length < 3) {
-        onError('حداقل ۳ نمونه واضح از چهره لازم است — نور بهتر و روبه‌روی دوربین بایستید')
-        return
-      }
-
-      const averaged = await extractAveragedEmbedding(crops)
-      if (!averaged) {
-        onError('استخراج بردار بیومتریک ناموفق بود — دوباره تلاش کنید')
-        return
-      }
-
-      const member = members.find((m) => m.userId === enrollUserId)
-      const res = await fetch('/api/attendance/enrollments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          userId: enrollUserId,
-          personName: member?.fullName,
-          imageBase64: previewCrop,
-          mimeType: 'image/jpeg',
-          faceEmbedding: averaged.embedding,
-          embeddingModel: averaged.model,
-          sampleCount: averaged.sampleCount,
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'ثبت شناسایی ناموفق')
-      setStatusText(
-        `بیومتریک «${member?.fullName}» با ${averaged.sampleCount} نمونه ذخیره شد — پایش خودکار را روشن کنید`
-      )
-      await loadEnrollments()
-      onEnrolled?.()
-    } catch (e) {
-      onError(e instanceof Error ? e.message : 'ثبت شناسایی ناموفق')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  function startReEnroll(enrollment: AttendanceEnrollment) {
-    setEnrollUserId(enrollment.userId)
-    setEditingId(null)
-    setStatusText(
-      `فرد «${enrollment.personName || 'انتخاب‌شده'}» برای ثبت مجدد انتخاب شد — دوربین را روشن کنید و «ثبت بیومتریک» را بزنید`
-    )
-  }
-
-  function startRename(enrollment: AttendanceEnrollment) {
-    setEditingId(enrollment.id)
-    setEditName(enrollment.personName || '')
-  }
-
-  async function saveEnrollmentName(enrollmentId: string) {
-    setRowBusyId(enrollmentId)
-    onError(null)
-    try {
-      const res = await fetch('/api/attendance/enrollments', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          enrollmentId,
-          personName: editName,
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'ویرایش نام ناموفق')
-      setEditingId(null)
-      setStatusText('نام به‌روز شد')
-      await loadEnrollments()
-      onEnrolled?.()
-    } catch (e) {
-      onError(e instanceof Error ? e.message : 'ویرایش نام ناموفق')
-    } finally {
-      setRowBusyId(null)
-    }
-  }
-
-  async function removeEnrollment(enrollment: AttendanceEnrollment) {
-    const label = enrollment.personName || 'این فرد'
-    if (!window.confirm(`ثبت چهره «${label}» حذف شود؟`)) return
-    setRowBusyId(enrollment.id)
-    onError(null)
-    try {
-      const qs = new URLSearchParams({
-        projectId,
-        enrollmentId: enrollment.id,
-      })
-      const res = await fetch(`/api/attendance/enrollments?${qs.toString()}`, {
-        method: 'DELETE',
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'حذف ناموفق')
-      if (enrollUserId === enrollment.userId) setEnrollUserId('')
-      if (editingId === enrollment.id) setEditingId(null)
-      setStatusText(`ثبت چهره «${label}» حذف شد`)
-      await loadEnrollments()
-      onEnrolled?.()
-    } catch (e) {
-      onError(e instanceof Error ? e.message : 'حذف ناموفق')
-    } finally {
-      setRowBusyId(null)
-    }
-  }
-
   useEffect(() => {
     void loadEnrollments().catch((e) =>
       onError(e instanceof Error ? e.message : 'خطا در لیست شناسایی‌ها')
@@ -731,166 +566,24 @@ export function GateCameraPanel({
           )}
         </div>
 
-        <div className="border-t pt-4 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <Label className="text-base">ثبت بیومتریک (۵ نمونه برای هر نفر)</Label>
-            <Badge variant="outline">
-              {enrollments.filter((e) => e.hasEmbedding).length}/{enrollments.length} بیومتریک
-            </Badge>
+        <div className="border-t pt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">ثبت بیومتریک افراد</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                در صفحه جدا، با راهنمای حرکات سر ثبت می‌شود — اینجا قاطی نمی‌شود
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {enrollments.filter((e) => e.hasEmbedding).length} نفر با بیومتریک فعال
+              </p>
+            </div>
+            <Button asChild className="shrink-0 bg-emerald-700 hover:bg-emerald-800">
+              <Link href="/dashboard/security/enroll">
+                <UserPlus className="h-4 w-4 ml-1" />
+                باز کردن صفحه ثبت
+              </Link>
+            </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            هنگام ثبت، کمی سر را چپ/راست کنید. سیستم میانگین بردار FaceNet را ذخیره می‌کند و هنگام تردد با فاصله اقلیدسی + حاشیه ابهام تطبیق می‌دهد.
-          </p>
-          <Input
-            value={memberQuery}
-            onChange={(e) => setMemberQuery(e.target.value)}
-            placeholder="جستجوی نام برای ثبت بیومتریک..."
-          />
-          <Select value={enrollUserId || undefined} onValueChange={setEnrollUserId}>
-            <SelectTrigger>
-              <SelectValue placeholder="انتخاب فرد برای ثبت چهره" />
-            </SelectTrigger>
-            <SelectContent>
-              {filteredMembers.map((m) => {
-                const enrolled = enrollments.find((e) => e.userId === m.userId)
-                return (
-                  <SelectItem key={m.userId} value={m.userId}>
-                    {m.fullName}
-                    {enrolled?.hasEmbedding ? ' ✓' : enrolled ? ' (نیاز به ثبت مجدد)' : ''}
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={busy || !previewOn || !enrollUserId || watching}
-            onClick={() => void enrollFromCamera()}
-          >
-            <UserPlus className="h-4 w-4 ml-1" />
-            {enrollments.some((e) => e.userId === enrollUserId)
-              ? 'ثبت مجدد بیومتریک از دوربین'
-              : 'ثبت بیومتریک از دوربین'}
-          </Button>
-
-          {enrollments.length > 0 ? (
-            <ul className="grid gap-2 sm:grid-cols-2 max-h-64 overflow-y-auto">
-              {enrollments.map((e) => {
-                const rowBusy = rowBusyId === e.id
-                const isEditing = editingId === e.id
-                return (
-                  <li
-                    key={e.id}
-                    className="rounded-md border px-2 py-2 text-sm space-y-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      {e.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={e.imageUrl}
-                          alt={e.personName || ''}
-                          className="h-10 w-10 rounded object-cover shrink-0"
-                        />
-                      ) : (
-                        <div className="h-10 w-10 rounded bg-muted shrink-0" />
-                      )}
-                      {isEditing ? (
-                        <Input
-                          value={editName}
-                          onChange={(ev) => setEditName(ev.target.value)}
-                          className="h-8 text-sm"
-                          disabled={rowBusy}
-                          autoFocus
-                        />
-                      ) : (
-                        <span className="truncate font-medium flex-1">
-                          {e.personName || e.userId}
-                          {!e.hasEmbedding ? (
-                            <span className="ms-1 text-[10px] font-normal text-amber-700">
-                              نیاز به ثبت مجدد
-                            </span>
-                          ) : (
-                            <span className="ms-1 text-[10px] font-normal text-emerald-700">
-                              {e.sampleCount ?? 1} نمونه
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 justify-end">
-                      {isEditing ? (
-                        <>
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            disabled={rowBusy || !editName.trim()}
-                            onClick={() => void saveEnrollmentName(e.id)}
-                          >
-                            {rowBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'ذخیره'}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2 text-xs"
-                            disabled={rowBusy}
-                            onClick={() => setEditingId(null)}
-                          >
-                            انصراف
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-xs"
-                            disabled={busy || rowBusy || watching}
-                            onClick={() => startRename(e)}
-                            title="ویرایش نام"
-                          >
-                            <Pencil className="h-3.5 w-3.5 ml-1" />
-                            نام
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-xs"
-                            disabled={busy || rowBusy || watching || !previewOn}
-                            onClick={() => startReEnroll(e)}
-                            title="ثبت مجدد چهره از دوربین"
-                          >
-                            <Camera className="h-3.5 w-3.5 ml-1" />
-                            چهره
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            className="h-7 px-2 text-xs"
-                            disabled={busy || rowBusy || watching}
-                            onClick={() => void removeEnrollment(e)}
-                            title="حذف ثبت چهره"
-                          >
-                            {rowBusy ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-3.5 w-3.5 ml-1" />
-                            )}
-                            حذف
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          ) : null}
         </div>
 
         {statusText ? (
