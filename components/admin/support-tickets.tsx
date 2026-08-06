@@ -1,7 +1,6 @@
 'use client'
 
-import type { AdminSupportTicket } from '@/types/admin'
-import { Badge } from '@/components/ui/badge'
+import type { AdminCriticalAlert, AdminSupportTicket } from '@/types/admin'
 import { cn } from '@/lib/utils'
 import { MessageSquare } from 'lucide-react'
 
@@ -20,19 +19,27 @@ const statusStyles = {
 }
 
 const statusLabels = {
-  open: 'Open',
-  in_progress: 'In Progress',
+  open: 'Urgent',
+  in_progress: 'Recent',
   resolved: 'Resolved',
   closed: 'Closed',
 }
 
 export function SupportTicketsPanel({ tickets }: { tickets: AdminSupportTicket[] }) {
+  if (tickets.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground py-6 text-center">
+        No project messages yet.
+      </p>
+    )
+  }
+
   return (
     <div className="divide-y divide-slate-100">
       {tickets.map((ticket) => (
         <div
           key={ticket.id}
-          className="py-3.5 first:pt-0 last:pb-0 transition-colors cursor-pointer"
+          className="py-3.5 first:pt-0 last:pb-0 transition-colors"
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
@@ -44,6 +51,9 @@ export function SupportTicketsPanel({ tickets }: { tickets: AdminSupportTicket[]
                 <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', statusStyles[ticket.status])}>
                   {statusLabels[ticket.status]}
                 </span>
+                {ticket.topic ? (
+                  <span className="text-xs text-muted-foreground capitalize">{ticket.topic}</span>
+                ) : null}
               </div>
               <p className="font-medium text-sm">{ticket.subject}</p>
               <p className="text-xs text-muted-foreground mt-1">
@@ -65,12 +75,20 @@ export function SupportTicketsPanel({ tickets }: { tickets: AdminSupportTicket[]
 export function CriticalAlertsPanel({
   alerts,
 }: {
-  alerts: { id: string; title: string; severity: 'medium' | 'high' | 'critical'; source: string; time: string }[]
+  alerts: AdminCriticalAlert[]
 }) {
   const severityStyles = {
     medium: 'border-l-amber-500 bg-amber-50/50',
     high: 'border-l-orange-600 bg-orange-50/50',
     critical: 'border-l-red-600 bg-red-50/50',
+  }
+
+  if (alerts.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground py-6 text-center">
+        No unresolved alerts right now.
+      </p>
+    )
   }
 
   return (
@@ -82,8 +100,12 @@ export function CriticalAlertsPanel({
         >
           <p className="text-sm font-medium">{alert.title}</p>
           <div className="flex items-center gap-2 mt-1">
-            <Badge variant="outline" className="text-xs capitalize">{alert.source}</Badge>
-            <span className="text-xs text-muted-foreground">{alert.time} ago</span>
+            <span className="inline-flex rounded-md border px-2 py-0.5 text-xs capitalize">
+              {alert.source}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {alert.time === 'now' || alert.time === '—' ? alert.time : `${alert.time} ago`}
+            </span>
           </div>
         </div>
       ))}

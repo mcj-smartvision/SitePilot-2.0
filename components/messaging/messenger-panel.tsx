@@ -51,7 +51,13 @@ const MIN_H = 420
 const DEFAULT_W = 720
 const DEFAULT_H = 640
 
-export function MessengerButton() {
+export function MessengerButton({
+  variant = 'default',
+  className,
+}: {
+  variant?: 'default' | 'nav'
+  className?: string
+}) {
   const [open, setOpen] = useState(false)
   const [projectId, setProjectId] = useState<string | null>(null)
   const [unread, setUnread] = useState(0)
@@ -148,16 +154,27 @@ export function MessengerButton() {
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          'relative inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-white shadow-md transition-all',
-          'bg-gradient-to-l from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500',
-          pulse && 'ring-2 ring-rose-400 ring-offset-2 ring-offset-background scale-105'
+          variant === 'nav'
+            ? 'relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900'
+            : cn(
+                'relative inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-white shadow-md transition-all',
+                'bg-gradient-to-l from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500',
+                pulse && 'ring-2 ring-rose-400 ring-offset-2 ring-offset-background scale-105'
+              ),
+          className
         )}
         title="پیام‌رسان"
       >
-        <MessageCircle className={cn('h-4 w-4', pulse && 'animate-bounce')} />
-        <span className="hidden sm:inline">پیام‌رسان</span>
+        <MessageCircle className={cn('h-4 w-4 shrink-0', pulse && variant !== 'nav' && 'animate-bounce')} />
+        <span className={cn(variant === 'nav' ? 'flex-1 text-start' : 'hidden sm:inline')}>پیام‌رسان</span>
         {unread > 0 && (
-          <span className="absolute -top-1.5 -start-1.5 min-w-[20px] h-[20px] rounded-full bg-rose-500 text-[11px] font-bold flex items-center justify-center px-1 shadow-lg border-2 border-white text-white animate-pulse">
+          <span
+            className={cn(
+              variant === 'nav'
+                ? 'inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white'
+                : 'absolute -top-1.5 -start-1.5 min-w-[20px] h-[20px] rounded-full bg-rose-500 text-[11px] font-bold flex items-center justify-center px-1 shadow-lg border-2 border-white text-white animate-pulse'
+            )}
+          >
             {unread > 99 ? '99+' : unread}
           </span>
         )}

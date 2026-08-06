@@ -261,4 +261,24 @@ export interface AdminSupportTicket {
   status: 'open' | 'in_progress' | 'resolved' | 'closed'
   created: string
   messages: number
+  topic?: string
+}
+
+export interface AdminCriticalAlert {
+  id: string
+  title: string
+  severity: 'medium' | 'high' | 'critical'
+  source: string
+  time: string
+}
+
+export interface ControlCenterFeeds {
+  activities: AdminActivityItem[]
+  presenceUsers: OnlineUser[]
+  insideCount: number
+  outsideCount: number
+  absentCount: number
+  tickets: AdminSupportTicket[]
+  alerts: AdminCriticalAlert[]
+  openMessageCount: number
 }

@@ -1,116 +1,74 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useSupabase } from '@/hooks/useSupabase'
-import { fetchAdminStats, fetchAllMembers } from '@/utils/admin'
+import { useControlCenterDetails } from '@/components/admin/control-center-details-context'
 import { PageHeader, LoadingBlock, ErrorBlock } from '@/components/admin/shared'
 import { StatCard } from '@/components/admin/stat-card'
 import { ActivityFeed } from '@/components/admin/activity-feed'
 import { OnlineUsersPanel } from '@/components/admin/online-users-panel'
 import { SupportTicketsPanel, CriticalAlertsPanel } from '@/components/admin/support-tickets'
 import { RoleDashboardGrid } from '@/components/admin/role-dashboard-grid'
-import { Button } from '@/components/ui/button'
-import {
-  getDemoActivities,
-  getDemoOnlineUsers,
-  getDemoSupportTickets,
-  getDemoCriticalAlerts,
-} from '@/lib/admin/demo-data'
-import type { AdminStats, ProjectMember } from '@/types/admin'
+import type { DetailKey } from '@/components/admin/control-center-details-context'
 import {
   Users,
   UserCheck,
-  Wifi,
+  MapPin,
   AlertCircle,
-  Ticket,
+  MessageSquare,
   Shield,
-  UserPlus,
-  FolderKanban,
+  type LucideIcon,
 } from 'lucide-react'
 import { APP_TAGLINE } from '@/lib/brand'
 
 export function AdminDashboard() {
-  const supabase = useSupabase()
-  const [stats, setStats] = useState<AdminStats | null>(null)
-  const [members, setMembers] = useState<ProjectMember[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        setLoading(true)
-        const [statsData, memberData] = await Promise.all([
-          fetchAdminStats(supabase),
-          fetchAllMembers(supabase),
-        ])
-        if (!cancelled) {
-          setStats(statsData)
-          setMembers(memberData)
-        }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load dashboard')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [supabase])
+  const { feeds, stats, members, loading, error, openDetail } = useControlCenterDetails()
 
   if (loading) return <LoadingBlock label="Loading control center..." />
   if (error || !stats) return <ErrorBlock message={error ?? 'Unable to load dashboard'} />
 
-  const activities = getDemoActivities().slice(0, 5)
-  const onlineUsers = getDemoOnlineUsers()
-  const tickets = getDemoSupportTickets()
-  const alerts = getDemoCriticalAlerts()
   const pendingPassword = members.filter((m) => !m.password_changed_by_member).length
   const activeMembers = members.filter((m) => m.is_active).length
-  const onlineNow = onlineUsers.filter((u) => u.status === 'online').length
-  const openTickets = tickets.filter((t) => t.status === 'open').length
+  const needsAttention = pendingPassword + feeds.alerts.length + feeds.openMessageCount
 
   return (
-    <div className="mx-auto max-w-[1280px] space-y-10">
+    <div className="mx-auto max-w-[1280px] space-y-8">
       <PageHeader
         title="Control Center"
         description={`${APP_TAGLINE} System overview and team monitoring — without the clutter.`}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" size="sm" className="h-9 rounded-lg">
-              <Link href="/admin/projects">Projects</Link>
-            </Button>
-            <Button asChild size="sm" className="h-9 rounded-lg">
-              <Link href="/admin/members">
-                <UserPlus className="h-4 w-4 me-1.5" />
-                Add Member
-              </Link>
-            </Button>
-          </div>
-        }
       />
 
-      {/* Primary metrics — room to breathe */}
       <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total Users" value={stats.memberCount} icon={Users} trend={`${stats.projectCount} projects`} />
         <StatCard label="Active Users" value={activeMembers} icon={UserCheck} trend="Currently enabled" trendType="up" />
-        <StatCard label="Online Now" value={onlineNow} icon={Wifi} trend="Live monitoring" trendType="up" />
+        <StatCard
+          label="On Site Now"
+          value={feeds.insideCount}
+          icon={MapPin}
+          trend={`${feeds.outsideCount} left · ${feeds.absentCount} absent`}
+          trendType={feeds.insideCount > 0 ? 'up' : 'neutral'}
+        />
         <StatCard
           label="Needs Attention"
-          value={openTickets + pendingPassword}
+          value={needsAttention}
           icon={AlertCircle}
-          trend={pendingPassword > 0 ? `${pendingPassword} password pending` : 'All clear'}
-          trendType={openTickets + pendingPassword > 0 ? 'warning' : 'up'}
+          trend={pendingPassword > 0 ? `${pendingPassword} password pending` : 'Live issues + messages'}
+          trendType={needsAttention > 0 ? 'warning' : 'up'}
         />
       </section>
 
-      {/* Secondary strip — quieter, not competing */}
       <section className="grid gap-3 sm:grid-cols-3">
-        <QuietMetric label="Support Tickets" value={tickets.length} hint={`${tickets.filter((t) => t.status === 'in_progress').length} in progress`} icon={Ticket} />
-        <QuietMetric label="Open Issues" value={openTickets} hint="Requires attention" icon={AlertCircle} />
+        <QuietMetric
+          label="Messages"
+          value={feeds.tickets.length}
+          hint={`${feeds.openMessageCount} urgent / open`}
+          icon={MessageSquare}
+        />
+        <QuietMetric
+          label="Open Alerts"
+          value={feeds.alerts.length}
+          hint="Unresolved critical & stock"
+          icon={AlertCircle}
+          warn={feeds.alerts.length > 0}
+        />
         <QuietMetric
           label="Password Pending"
           value={pendingPassword}
@@ -120,27 +78,47 @@ export function AdminDashboard() {
         />
       </section>
 
-      <section className="grid gap-8 xl:grid-cols-[1.4fr_1fr]">
-        <Panel title="Recent Activity" hint="Latest site actions">
-          <ActivityFeed activities={activities} />
-        </Panel>
-        <Panel title="Online Users" hint={`${onlineNow} active now`}>
-          <OnlineUsersPanel users={onlineUsers} />
-        </Panel>
-      </section>
+      <ControlCenterExpandedPanel />
 
-      <section className="grid gap-8 xl:grid-cols-2">
-        <Panel title="Support & Messages" action={<span className="text-xs text-muted-foreground">View all</span>}>
-          <SupportTicketsPanel tickets={tickets} />
-        </Panel>
-        <Panel title="Critical Alerts">
-          <CriticalAlertsPanel alerts={alerts} />
-        </Panel>
-      </section>
+      {!openDetail ? (
+        <p className="hidden lg:block text-sm text-muted-foreground text-center py-12">
+          از منوی راست یک آیتم را انتخاب کنید تا اینجا باز شود.
+        </p>
+      ) : null}
+    </div>
+  )
+}
 
-      {stats.roleBreakdown && stats.roleBreakdown.length > 0 ? (
-        <Panel title="Access by Role" hint="Active memberships by position">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+function ControlCenterExpandedPanel() {
+  const { feeds, stats, members, openDetail } = useControlCenterDetails()
+  if (!openDetail || !stats) return null
+
+  const titles: Record<DetailKey, string> = {
+    messages: 'Support & Messages',
+    alerts: 'Critical Alerts',
+    roles: 'Access by Role',
+    dashboards: 'داشبورد اعضا',
+    activity: 'Recent Activity',
+    presence: 'Site Presence',
+  }
+
+  return (
+    <section className="rounded-2xl border border-slate-300 bg-white shadow-sm overflow-hidden">
+      <div className="border-b border-slate-100 px-5 py-4">
+        <h2 className="text-base font-semibold tracking-tight">{titles[openDetail]}</h2>
+        {openDetail === 'dashboards' ? (
+          <p className="text-xs text-muted-foreground mt-0.5">
+            اعضای تعریف‌شده و خلاصه وظایف
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground mt-0.5">Live data — full view</p>
+        )}
+      </div>
+      <div className="p-5 max-h-[min(78vh,720px)] overflow-y-auto">
+        {openDetail === 'messages' ? <SupportTicketsPanel tickets={feeds.tickets} /> : null}
+        {openDetail === 'alerts' ? <CriticalAlertsPanel alerts={feeds.alerts} /> : null}
+        {openDetail === 'roles' && stats.roleBreakdown ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {stats.roleBreakdown.map((item) => (
               <div key={item.role} className="rounded-xl bg-slate-50 px-4 py-4">
                 <p className="text-xs text-muted-foreground">{item.role}</p>
@@ -148,27 +126,12 @@ export function AdminDashboard() {
               </div>
             ))}
           </div>
-        </Panel>
-      ) : null}
-
-      <section className="space-y-5 pt-2">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="max-w-xl">
-            <h2 className="text-lg font-semibold tracking-tight">Role Dashboard Previews</h2>
-            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-              See what each site role sees — without switching accounts.
-            </p>
-          </div>
-          <Button asChild variant="outline" size="sm" className="h-9 rounded-lg shrink-0">
-            <Link href="/admin/members">
-              <FolderKanban className="h-4 w-4 me-1.5" />
-              Manage Members
-            </Link>
-          </Button>
-        </div>
-        <RoleDashboardGrid />
-      </section>
-    </div>
+        ) : null}
+        {openDetail === 'dashboards' ? <RoleDashboardGrid members={members} /> : null}
+        {openDetail === 'activity' ? <ActivityFeed activities={feeds.activities} /> : null}
+        {openDetail === 'presence' ? <OnlineUsersPanel users={feeds.presenceUsers} /> : null}
+      </div>
+    </section>
   )
 }
 
@@ -182,7 +145,7 @@ function QuietMetric({
   label: string
   value: number
   hint: string
-  icon: typeof Ticket
+  icon: LucideIcon
   warn?: boolean
 }) {
   return (
@@ -202,30 +165,5 @@ function QuietMetric({
         </div>
       </div>
     </div>
-  )
-}
-
-function Panel({
-  title,
-  hint,
-  action,
-  children,
-}: {
-  title: string
-  hint?: string
-  action?: ReactNode
-  children: ReactNode
-}) {
-  return (
-    <section className="rounded-2xl border border-slate-200/80 bg-white">
-      <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
-        <div>
-          <h3 className="text-[15px] font-semibold tracking-tight">{title}</h3>
-          {hint ? <p className="text-xs text-muted-foreground mt-0.5">{hint}</p> : null}
-        </div>
-        {action}
-      </div>
-      <div className="p-5">{children}</div>
-    </section>
   )
 }

@@ -6,7 +6,7 @@
  *
  * Run: npm run backup
  */
-import { execSync, spawnSync } from 'child_process'
+import { execFileSync, spawnSync } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'fs'
 import { join, resolve } from 'path'
 
@@ -33,7 +33,7 @@ function findPgDump() {
     if (existsSync(base)) {
       for (const dir of readdirSync(base)) {
         const candidate = join(base, dir, 'bin', 'pg_dump.exe')
-        if (existsSync(candidate)) return `"${candidate}"`
+        if (existsSync(candidate)) return candidate
       }
     }
   }
@@ -113,11 +113,21 @@ function maskUrl(url) {
 }
 
 function runPgDump(pgDump, databaseUrl, backupPath) {
-  execSync(`${pgDump} "${databaseUrl}" -F p --no-owner --no-acl -f "${backupPath}"`, {
-    stdio: 'pipe',
-    shell: true,
-    env: { ...process.env, PGSSLMODE: process.env.PGSSLMODE || 'require' },
-  })
+  // Options first, connection last — avoids "too many command-line arguments" on Windows
+  const result = spawnSync(
+    pgDump,
+    ['-Fp', '--no-owner', '--no-acl', '-f', backupPath, '-d', databaseUrl],
+    {
+      encoding: 'utf8',
+      shell: false,
+      env: { ...process.env, PGSSLMODE: process.env.PGSSLMODE || 'require' },
+    }
+  )
+  if (result.status !== 0) {
+    const err = new Error(result.stderr || result.stdout || 'pg_dump failed')
+    err.stderr = result.stderr
+    throw err
+  }
 }
 
 const envFile = loadEnvLocal()
@@ -161,6 +171,20 @@ for (const url of urls) {
   } catch (error) {
     lastError = error
     const msg = String(error.stderr || error.message || error)
+    if (msg.includes('server version mismatch')) {
+      console.log('   ↳ نسخه pg_dump قدیمی است؛ بکاپ منطقی با Python…')
+      try {
+        execFileSync('python', ['scripts/backup-logical.py'], {
+          stdio: 'inherit',
+          cwd: process.cwd(),
+          shell: true,
+        })
+        process.exit(0)
+      } catch (pyErr) {
+        lastError = pyErr
+        break
+      }
+    }
     if (msg.includes('Connection refused') || msg.includes('ENOTFOUND') || msg.includes('timeout')) {
       console.log('   ↳ ناموفق، تلاش بعدی…')
       continue

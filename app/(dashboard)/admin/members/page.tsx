@@ -20,7 +20,7 @@ import type { AdminProject, Position, ProjectMember } from '@/types/admin'
 import { formatLoginDisplay } from '@/lib/auth/login-identifier'
 import { getAdminMemberMessages } from '@/lib/i18n/admin-member'
 import { useLocale } from '@/components/i18n/locale-provider'
-import { KeyRound, Pencil, ShieldAlert, UserCheck, Users } from 'lucide-react'
+import { KeyRound, Pencil, UserCheck, Users } from 'lucide-react'
 
 export default function AdminMembersPage() {
   const supabase = useSupabase()
@@ -132,8 +132,11 @@ export default function AdminMembersPage() {
   if (loading) return <LoadingBlock label={t.loadingPositions} />
   if (error) return <ErrorBlock message={error} onRetry={() => window.location.reload()} />
 
-  const activeCount = members.filter((m) => m.is_active).length
-  const pendingPassword = members.filter((m) => !m.password_changed_by_member).length
+  const projectMembers = selectedProjectId
+    ? members.filter((m) => m.project_id === selectedProjectId)
+    : members
+  const activeCount = projectMembers.filter((m) => m.is_active).length
+  const pendingPassword = projectMembers.filter((m) => !m.password_changed_by_member).length
 
   return (
     <div className="space-y-6 max-w-[1400px]">
@@ -154,7 +157,7 @@ export default function AdminMembersPage() {
               <Users className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{members.length}</p>
+              <p className="text-2xl font-bold">{projectMembers.length}</p>
               <p className="text-xs text-muted-foreground">{t.totalMembers}</p>
             </div>
           </CardContent>
@@ -186,7 +189,13 @@ export default function AdminMembersPage() {
       {projects.length > 0 ? (
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium">{t.project}:</span>
-          <Select value={selectedProjectId || undefined} onValueChange={setSelectedProjectId}>
+          <Select
+            value={selectedProjectId || undefined}
+            onValueChange={(id) => {
+              setSelectedProjectId(id)
+              setShowForm(false)
+            }}
+          >
             <SelectTrigger className="w-[240px]">
               <SelectValue placeholder={t.selectProject} />
             </SelectTrigger>
@@ -223,7 +232,7 @@ export default function AdminMembersPage() {
           <CardTitle className="text-base font-semibold">{t.teamDirectory}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {members.length === 0 ? (
+          {projectMembers.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">{t.noMembers}</div>
           ) : (
             <div className="overflow-x-auto">
@@ -240,7 +249,7 @@ export default function AdminMembersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map((member) => (
+                  {projectMembers.map((member) => (
                     <tr key={member.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3.5">
                         <p className="font-medium">{member.full_name}</p>

@@ -17,6 +17,14 @@ const typeColors = {
 }
 
 export function ActivityFeed({ activities }: { activities: AdminActivityItem[] }) {
+  if (activities.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground py-6 text-center">
+        No recent activity yet — reports, gate events, and alerts will appear here.
+      </p>
+    )
+  }
+
   return (
     <div className="divide-y divide-slate-100">
       {activities.map((item) => {

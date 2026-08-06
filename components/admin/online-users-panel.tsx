@@ -9,9 +9,23 @@ const statusStyles = {
   offline: 'bg-slate-300',
 }
 
+const statusHint = {
+  online: 'On site',
+  idle: 'Left today',
+  offline: 'Absent',
+}
+
 export function OnlineUsersPanel({ users }: { users: OnlineUser[] }) {
+  if (users.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground py-6 text-center">
+        No active members to show presence for.
+      </p>
+    )
+  }
+
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 max-h-[420px] overflow-y-auto">
       {users.map((user) => (
         <div
           key={user.id}
@@ -30,6 +44,7 @@ export function OnlineUsersPanel({ users }: { users: OnlineUser[] }) {
                 'absolute -bottom-0.5 -end-0.5 h-2.5 w-2.5 rounded-full border-2 border-white',
                 statusStyles[user.status]
               )}
+              title={statusHint[user.status]}
             />
           </div>
           <div className="min-w-0 flex-1">
