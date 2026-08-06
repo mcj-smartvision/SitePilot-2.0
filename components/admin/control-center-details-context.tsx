@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSupabase } from '@/hooks/useSupabase'
 import { fetchAdminStats, fetchAllMembers } from '@/utils/admin'
-import { fetchControlCenterFeeds } from '@/utils/admin/control-center'
+import { fetchControlCenterFeeds } from '@/lib/admin/control-center'
 import type { AdminStats, ControlCenterFeeds, ProjectMember } from '@/types/admin'
 
 export type DetailKey =
