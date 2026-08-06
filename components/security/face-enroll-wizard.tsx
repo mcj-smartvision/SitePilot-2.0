@@ -34,23 +34,94 @@ import {
   detectFacesInVideo,
   drawFaceBoxes,
 } from '@/lib/attendance/face-detect'
-import { extractFaceEmbedding, warmFaceEmbedder } from '@/lib/attendance/face-embed.client'
-import { ENROLL_POSES, type EnrollPose } from '@/lib/attendance/enroll-poses'
+import { extractFaceEmbeddingFromVideo, warmFaceEmbedder } from '@/lib/attendance/face-embed.client'
+import { euclideanDistance } from '@/lib/attendance/face-match'
+import {
+  ENROLL_CAPTURE_EVERY_MS,
+  ENROLL_LIVE_TIPS_FA,
+  ENROLL_MAX_SAMPLES,
+  ENROLL_MIN_DIVERSITY,
+  ENROLL_MIN_SAMPLES,
+  ENROLL_SESSION_MS,
+  poseLabel,
+} from '@/lib/attendance/enroll-poses'
 import type { AttendanceEnrollment } from '@/lib/attendance/types'
 import { cn } from '@/lib/utils'
 
 type MemberOption = { userId: string; fullName: string; email: string | null }
 
 type CapturedSample = {
-  pose: EnrollPose
+  poseId: string
+  labelFa: string
   imageBase64: string
   faceEmbedding: number[]
 }
 
-type WizardPhase = 'setup' | 'running' | 'saving' | 'done'
+type WizardPhase = 'setup' | 'running' | 'saving' | 'retry' | 'done'
 
 function sleep(ms: number) {
   return new Promise<void>((r) => window.setTimeout(r, ms))
+}
+
+function isDiverseEnough(candidate: number[], kept: number[][]): boolean {
+  if (kept.length === 0) return true
+  return kept.every((emb) => euclideanDistance(candidate, emb) >= ENROLL_MIN_DIVERSITY)
+}
+
+function EnrollProgressRing({
+  value,
+  max,
+  secondsLeft,
+  complete,
+}: {
+  value: number
+  max: number
+  secondsLeft: number
+  complete?: boolean
+}) {
+  const size = 88
+  const stroke = 8
+  const r = (size - stroke) / 2
+  const c = 2 * Math.PI * r
+  const pct = Math.min(1, value / Math.max(1, max))
+  const offset = c * (1 - pct)
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="rgba(255,255,255,0.2)"
+          strokeWidth={stroke}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={complete || pct >= 1 ? '#34d399' : '#6ee7b7'}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          className="transition-[stroke-dashoffset] duration-300 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+        {complete || pct >= 1 ? (
+          <CheckCircle2 className="h-7 w-7 text-emerald-300" />
+        ) : (
+          <>
+            <span className="text-lg font-bold tabular-nums leading-none">{value}</span>
+            <span className="text-[10px] text-white/70 mt-0.5">{secondsLeft}s</span>
+          </>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export function FaceEnrollWizardPage({
@@ -66,6 +137,7 @@ export function FaceEnrollWizardPage({
   const overlayRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const abortRef = useRef(false)
+  const capturingRef = useRef(false)
 
   const [enrollments, setEnrollments] = useState<AttendanceEnrollment[]>([])
   const [memberQuery, setMemberQuery] = useState('')
@@ -74,15 +146,14 @@ export function FaceEnrollWizardPage({
   const [deviceId, setDeviceId] = useState('')
   const [previewOn, setPreviewOn] = useState(false)
   const [phase, setPhase] = useState<WizardPhase>('setup')
-  const [poseIndex, setPoseIndex] = useState(0)
-  const [countdown, setCountdown] = useState<number | null>(null)
+  const [secondsLeft, setSecondsLeft] = useState(0)
+  const [liveTip, setLiveTip] = useState(ENROLL_LIVE_TIPS_FA[0])
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [captured, setCaptured] = useState<CapturedSample[]>([])
 
   const selectedMember = members.find((m) => m.userId === userId) ?? null
-  const currentPose = ENROLL_POSES[poseIndex]
 
   const filteredMembers = members.filter((m) => {
     const q = memberQuery.trim().toLowerCase()
@@ -159,28 +230,94 @@ export function FaceEnrollWizardPage({
     }
   }, [phase, previewOn])
 
-  async function captureCurrentPose(pose: EnrollPose): Promise<CapturedSample | null> {
-    const video = videoRef.current
-    if (!video) return null
-    for (let attempt = 0; attempt < 8; attempt++) {
-      if (abortRef.current) return null
-      const boxes = await detectFacesInVideo(video)
-      const best = boxes[0]
-      if (best && best.width * best.height > 40 * 40) {
-        const crop = cropFaceFromVideo(video, best, 0.4, 0.94)
-        if (crop) {
-          const embedding = await extractFaceEmbedding(crop)
-          if (embedding) {
-            return { pose, imageBase64: crop, faceEmbedding: embedding }
-          }
-        }
-      }
-      await sleep(280)
+  async function saveCapturedSamples(samples: CapturedSample[]) {
+    if (!userId || samples.length < ENROLL_MIN_SAMPLES) {
+      throw new Error(`حداقل ${ENROLL_MIN_SAMPLES} نمونه متنوع لازم است`)
     }
-    return null
+    setPhase('saving')
+    setStatus('ذخیره بیومتریک…')
+    setError(null)
+
+    const res = await fetch('/api/attendance/enrollments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectId,
+        userId,
+        personName: selectedMember?.fullName,
+        samples: samples.map((s) => ({
+          imageBase64: s.imageBase64.replace(/^data:[^;]+;base64,/, ''),
+          faceEmbedding: s.faceEmbedding,
+          pose: s.poseId,
+          mimeType: 'image/jpeg',
+        })),
+      }),
+    })
+
+    const raw = await res.text()
+    let json: { error?: string } = {}
+    try {
+      json = raw ? (JSON.parse(raw) as { error?: string }) : {}
+    } catch {
+      throw new Error(
+        res.status === 413
+          ? 'حجم عکس‌ها زیاد بود — تلاش مجدد ذخیره را بزنید'
+          : `پاسخ نامعتبر از سرور (HTTP ${res.status})`
+      )
+    }
+    if (!res.ok) throw new Error(json.error || `ذخیره ناموفق (HTTP ${res.status})`)
+
+    setPhase('done')
+    setStatus(`ثبت «${selectedMember?.fullName}» با ${samples.length} نمونه متنوع انجام شد`)
+    await loadEnrollments()
+    stopCamera()
   }
 
-  async function runGuidedCapture() {
+  async function tryCaptureOne(kept: CapturedSample[]): Promise<{
+    sample: CapturedSample | null
+    reason: 'ok' | 'no_face' | 'embed_fail' | 'not_diverse' | 'crop_fail'
+  }> {
+    const video = videoRef.current
+    if (!video) return { sample: null, reason: 'no_face' }
+
+    // Run FaceNet on the full video — tight MediaPipe crops often fail SSD detect
+    const extracted = await extractFaceEmbeddingFromVideo(video)
+    if (!extracted) return { sample: null, reason: 'embed_fail' }
+
+    if (!isDiverseEnough(extracted.embedding, kept.map((s) => s.faceEmbedding))) {
+      return { sample: null, reason: 'not_diverse' }
+    }
+
+    const crop =
+      cropFaceFromVideo(
+        video,
+        {
+          x: extracted.box.x,
+          y: extracted.box.y,
+          width: extracted.box.width,
+          height: extracted.box.height,
+          score: 1,
+        },
+        0.35,
+        0.72,
+        192
+      ) || null
+
+    if (!crop) return { sample: null, reason: 'crop_fail' }
+
+    const n = kept.length + 1
+    return {
+      sample: {
+        poseId: `auto_${n}`,
+        labelFa: poseLabel(`auto_${n}`, true),
+        imageBase64: crop,
+        faceEmbedding: extracted.embedding,
+      },
+      reason: 'ok',
+    }
+  }
+
+  async function runFreeScan() {
     if (!userId) {
       setError('ابتدا نام فرد را انتخاب کنید')
       return
@@ -189,77 +326,117 @@ export function FaceEnrollWizardPage({
     setCaptured([])
     abortRef.current = false
     setPhase('running')
-    setPoseIndex(0)
-    setStatus('آماده‌سازی دوربین و مدل…')
+    setSecondsLeft(Math.ceil(ENROLL_SESSION_MS / 1000))
+    setLiveTip(ENROLL_LIVE_TIPS_FA[0])
+    setStatus('آماده‌سازی مدل FaceNet (محلی)…')
 
+    const samples: CapturedSample[] = []
+    let failStreak = { no_face: 0, embed_fail: 0, not_diverse: 0 }
     try {
       await warmFaceEmbedder()
       if (!previewOn) await startCamera(deviceId || undefined)
 
-      const samples: CapturedSample[] = []
-      for (let i = 0; i < ENROLL_POSES.length; i++) {
-        if (abortRef.current) throw new Error('لغو شد')
-        const pose = ENROLL_POSES[i]
-        setPoseIndex(i)
-        setStatus(pose.hintFa)
-        setCountdown(null)
-        await sleep(900)
+      setStatus('صورت را در قاب نگه دار و سر را آرام بچرخان')
+      const started = performance.now()
+      let tipIdx = 0
+      let lastTipAt = started
+      let lastTickAt = 0
 
-        for (let c = 3; c >= 1; c--) {
-          if (abortRef.current) throw new Error('لغو شد')
-          setCountdown(c)
-          await sleep(700)
-        }
-        setCountdown(null)
-        setStatus(`در حال ثبت: ${pose.labelFa}`)
+      while (!abortRef.current) {
+        const elapsed = performance.now() - started
+        if (elapsed >= ENROLL_SESSION_MS) break
+        if (samples.length >= ENROLL_MAX_SAMPLES) break
 
-        const sample = await captureCurrentPose(pose)
-        if (!sample) {
-          throw new Error(`ثبت زاویه «${pose.labelFa}» ناموفق بود — نور و موقعیت صورت را بهتر کنید`)
+        const left = Math.max(0, Math.ceil((ENROLL_SESSION_MS - elapsed) / 1000))
+        setSecondsLeft(left)
+
+        if (performance.now() - lastTipAt > 4500) {
+          tipIdx = (tipIdx + 1) % ENROLL_LIVE_TIPS_FA.length
+          setLiveTip(ENROLL_LIVE_TIPS_FA[tipIdx])
+          lastTipAt = performance.now()
         }
-        samples.push(sample)
-        setCaptured([...samples])
-        setStatus(`✓ ${pose.labelFa}`)
-        await sleep(450)
+
+        if (!capturingRef.current && performance.now() - lastTickAt >= ENROLL_CAPTURE_EVERY_MS) {
+          lastTickAt = performance.now()
+          capturingRef.current = true
+          try {
+            const { sample, reason } = await tryCaptureOne(samples)
+            if (sample) {
+              samples.push(sample)
+              setCaptured([...samples])
+              failStreak = { no_face: 0, embed_fail: 0, not_diverse: 0 }
+              setStatus(`نمونه ${samples.length}/${ENROLL_MAX_SAMPLES} ثبت شد`)
+            } else if (reason === 'no_face' || reason === 'embed_fail') {
+              if (reason === 'no_face') failStreak.no_face++
+              else failStreak.embed_fail++
+              if (samples.length === 0) {
+                setStatus(
+                  failStreak.embed_fail > failStreak.no_face
+                    ? 'چهره پیدا شد ولی استخراج بیومتریک نشد — نور را بهتر کن، روبه‌رو بایست'
+                    : 'صورت در قاب دیده نمی‌شود — نزدیک‌تر و روبه‌روی دوربین بایست'
+                )
+              }
+            } else if (reason === 'not_diverse') {
+              failStreak.not_diverse++
+              setStatus(
+                `نمونه ${samples.length}/${ENROLL_MAX_SAMPLES} — سر را کمی بیشتر بچرخان تا زاویه جدید ثبت شود`
+              )
+            }
+          } finally {
+            capturingRef.current = false
+          }
+        }
+
+        await sleep(60)
       }
 
-      setPhase('saving')
-      setStatus('ذخیره بیومتریک…')
-      const res = await fetch('/api/attendance/enrollments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          userId,
-          personName: selectedMember?.fullName,
-          samples: samples.map((s) => ({
-            imageBase64: s.imageBase64,
-            faceEmbedding: s.faceEmbedding,
-            pose: s.pose.id,
-            mimeType: 'image/jpeg',
-          })),
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'ذخیره ناموفق')
+      if (abortRef.current) throw new Error('لغو شد')
 
-      setPhase('done')
-      setStatus(`ثبت «${selectedMember?.fullName}» با ${samples.length} زاویه انجام شد`)
-      await loadEnrollments()
-      stopCamera()
+      if (samples.length < ENROLL_MIN_SAMPLES) {
+        setCaptured(samples)
+        setPhase('setup')
+        const hint =
+          samples.length === 0
+            ? 'هیچ نمونه‌ای ثبت نشد. نور محیط را بیشتر کن، صورت را کامل در قاب بگذار و صفحه را یک‌بار رفرش کن.'
+            : `فقط ${samples.length} نمونه متنوع گرفته شد (حداقل ${ENROLL_MIN_SAMPLES}). سر را بیشتر بچرخان و دوباره شروع کن.`
+        throw new Error(hint)
+      }
+
+      await saveCapturedSamples(samples)
     } catch (e) {
-      setPhase('setup')
-      setError(e instanceof Error ? e.message : 'ثبت ناموفق')
+      const message = e instanceof Error ? e.message : 'ثبت ناموفق'
+      setError(message)
       setStatus(null)
+      if (samples.length >= ENROLL_MIN_SAMPLES) {
+        setCaptured(samples)
+        setPhase('retry')
+      } else {
+        setPhase('setup')
+      }
     } finally {
-      setCountdown(null)
+      setSecondsLeft(0)
+    }
+  }
+
+  async function retrySave() {
+    if (captured.length < ENROLL_MIN_SAMPLES) {
+      setError('نمونه‌ای برای ذخیره نمانده — دوباره شروع کنید')
+      setPhase('setup')
+      return
+    }
+    try {
+      await saveCapturedSamples(captured)
+    } catch (e) {
+      setPhase('retry')
+      setError(e instanceof Error ? e.message : 'ذخیره ناموفق')
+      setStatus(null)
     }
   }
 
   function cancelRunning() {
     abortRef.current = true
     setPhase('setup')
-    setCountdown(null)
+    setSecondsLeft(0)
     setStatus('لغو شد')
     stopCamera()
   }
@@ -310,7 +487,7 @@ export function FaceEnrollWizardPage({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <PageHeader
           title="ثبت بیومتریک افراد"
-          description={`${projectName} — صفحه جدا برای ثبت اولیه؛ با پایش گیت قاطی نمی‌شود`}
+          description={`${projectName} — اسکن ۳۰ ثانیه‌ای خودکار؛ سر را آزادانه بچرخان`}
         />
         <Button asChild variant="outline">
           <Link href="/dashboard/security">
@@ -328,7 +505,7 @@ export function FaceEnrollWizardPage({
 
       <SectionCard
         title="ثبت فرد جدید"
-        description="نام را انتخاب کنید، شروع را بزنید؛ برنامه مرحله‌به‌مرحله زاویه‌ها را راهنمایی می‌کند"
+        description="نام را انتخاب کن و شروع را بزن. حدود ۳۰ ثانیه مستقیم نگاه کن و سر را بالا/پایین/چپ/راست بچرخان — سیستم خودش نمونه‌های متنوع را برمی‌دارد."
       >
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -398,16 +575,44 @@ export function FaceEnrollWizardPage({
                 type="button"
                 className="bg-emerald-700 hover:bg-emerald-800"
                 disabled={!userId}
-                onClick={() => void runGuidedCapture()}
+                onClick={() => void runFreeScan()}
               >
                 <Play className="h-4 w-4 ml-1" />
-                شروع ثبت هدایت‌شده
+                شروع اسکن ۳۰ ثانیه‌ای
               </Button>
-            ) : (
-              <Button type="button" variant="destructive" onClick={cancelRunning}>
+            ) : null}
+            {phase === 'retry' ? (
+              <>
+                <Button
+                  type="button"
+                  className="bg-emerald-700 hover:bg-emerald-800"
+                  onClick={() => void retrySave()}
+                >
+                  تلاش مجدد ذخیره ({captured.length} نمونه)
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setPhase('setup')
+                    setCaptured([])
+                    setError(null)
+                  }}
+                >
+                  شروع از اول
+                </Button>
+              </>
+            ) : null}
+            {phase === 'running' || phase === 'saving' ? (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={cancelRunning}
+                disabled={phase === 'saving'}
+              >
                 لغو
               </Button>
-            )}
+            ) : null}
             {selectedMember ? (
               <Badge variant="outline" className="h-9 px-3 text-sm">
                 <UserPlus className="h-3.5 w-3.5 ml-1" />
@@ -416,104 +621,84 @@ export function FaceEnrollWizardPage({
             ) : null}
           </div>
 
-          {(phase === 'running' || phase === 'saving' || phase === 'done' || phase === 'setup') && (
-            <div className="relative overflow-hidden rounded-2xl border bg-black aspect-video">
-              <video
-                ref={videoRef}
-                className="h-full w-full object-cover"
-                playsInline
-                muted
-                autoPlay
-              />
-              <canvas
-                ref={overlayRef}
-                className="pointer-events-none absolute inset-0 h-full w-full"
-              />
+          <div className="relative overflow-hidden rounded-2xl border bg-black aspect-video">
+            <video
+              ref={videoRef}
+              className="h-full w-full object-cover"
+              playsInline
+              muted
+              autoPlay
+            />
+            <canvas
+              ref={overlayRef}
+              className="pointer-events-none absolute inset-0 h-full w-full"
+            />
 
-              {phase === 'running' && currentPose ? (
-                <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/80 to-transparent px-4 pt-4 pb-16 text-center">
-                  <p className="text-xs font-medium text-emerald-300 tracking-wide">
-                    مرحله {poseIndex + 1} از {ENROLL_POSES.length}
-                  </p>
-                  <p className="mt-1 text-2xl sm:text-3xl font-bold text-white tracking-tight">
-                    {currentPose.labelFa}
-                  </p>
-                  <p className="mt-1 text-sm text-white/80">{currentPose.hintFa}</p>
-                  <p className="mt-0.5 text-xs text-white/50">{currentPose.labelEn}</p>
-                </div>
-              ) : null}
-
-              {countdown != null ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/35">
-                  <span className="text-7xl font-bold text-white drop-shadow-lg tabular-nums">
-                    {countdown}
-                  </span>
-                </div>
-              ) : null}
-
-              {phase === 'saving' ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 text-white">
-                  <Loader2 className="h-8 w-8 animate-spin" />
-                  <span>در حال ذخیره…</span>
-                </div>
-              ) : null}
-
-              {phase === 'setup' && !previewOn ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70 text-sm">
-                  <Camera className="h-8 w-8" />
-                  <span>نام را انتخاب کنید و «شروع ثبت هدایت‌شده» را بزنید</span>
-                </div>
-              ) : null}
-
-              {phase === 'done' ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-emerald-950/70 text-white">
-                  <CheckCircle2 className="h-10 w-10 text-emerald-400" />
-                  <span className="font-semibold">ثبت کامل شد</span>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          {ENROLL_POSES.length > 0 ? (
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-              {ENROLL_POSES.map((pose, i) => {
-                const done = captured.some((c) => c.pose.id === pose.id)
-                const active = phase === 'running' && i === poseIndex
-                return (
-                  <div
-                    key={pose.id}
-                    className={cn(
-                      'rounded-lg border px-2 py-2 text-center text-[11px] leading-snug',
-                      done && 'border-emerald-500 bg-emerald-50 text-emerald-900',
-                      active && 'border-sky-500 bg-sky-50 text-sky-900 ring-2 ring-sky-200',
-                      !done && !active && 'text-muted-foreground'
-                    )}
-                  >
-                    <span className="block font-medium">{i + 1}. {pose.labelFa}</span>
-                    {done ? (
-                      <CheckCircle2 className="mx-auto mt-1 h-3.5 w-3.5 text-emerald-600" />
-                    ) : null}
+            {phase === 'running' ? (
+              <>
+                <div className="absolute top-3 start-3 end-3 flex items-start justify-between gap-3">
+                  <div className="rounded-xl bg-black/55 px-3 py-2 text-white max-w-[60%]">
+                    <p className="text-sm font-semibold text-emerald-300">{liveTip}</p>
+                    <p className="text-[11px] text-white/75 mt-0.5">
+                      {captured.length}/{ENROLL_MAX_SAMPLES} نمونه
+                      {captured.length >= ENROLL_MIN_SAMPLES ? ' · آماده ذخیره' : ''}
+                    </p>
                   </div>
-                )
-              })}
-            </div>
-          ) : null}
+                  <EnrollProgressRing
+                    value={captured.length}
+                    max={ENROLL_MAX_SAMPLES}
+                    secondsLeft={secondsLeft}
+                    complete={captured.length >= ENROLL_MAX_SAMPLES}
+                  />
+                </div>
+              </>
+            ) : null}
+
+            {phase === 'saving' ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 text-white">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span>در حال ذخیره…</span>
+              </div>
+            ) : null}
+
+            {phase === 'setup' && !previewOn ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70 text-sm px-6 text-center">
+                <Camera className="h-8 w-8" />
+                <span>نام را انتخاب کن و «شروع اسکن ۳۰ ثانیه‌ای» را بزن</span>
+              </div>
+            ) : null}
+
+            {phase === 'done' ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-emerald-950/70 text-white">
+                <EnrollProgressRing
+                  value={ENROLL_MAX_SAMPLES}
+                  max={ENROLL_MAX_SAMPLES}
+                  secondsLeft={0}
+                  complete
+                />
+                <span className="font-semibold">ثبت کامل شد</span>
+              </div>
+            ) : null}
+          </div>
 
           {status ? (
             <p className="text-sm rounded-md border bg-muted/40 px-3 py-2">{status}</p>
           ) : null}
 
-          {phase === 'done' && captured.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+          {captured.length > 0 && phase !== 'setup' ? (
+            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-2">
               {captured.map((c) => (
-                <div key={c.pose.id} className="rounded-lg border overflow-hidden bg-white">
+                <div
+                  key={c.poseId}
+                  className={cn('rounded-lg border overflow-hidden bg-white')}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={c.imageBase64}
-                    alt={c.pose.labelFa}
+                    alt={c.labelFa}
                     className="aspect-square w-full object-cover"
                   />
-                  <p className="px-1.5 py-1 text-[10px] text-center truncate">{c.pose.labelFa}</p>
+                  <p className="px-1.5 py-1 text-[10px] text-center truncate">{c.labelFa}</p>
                 </div>
               ))}
             </div>
@@ -523,7 +708,7 @@ export function FaceEnrollWizardPage({
 
       <SectionCard
         title="افراد ثبت‌شده"
-        description="نام و عکس‌های هر زاویه را ببینید؛ می‌توانید یک عکس یا کل فرد را حذف کنید"
+        description="نام و عکس‌های نمونه‌ها را ببینید؛ می‌توانید یک عکس یا کل فرد را حذف کنید"
       >
         {enrollments.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">
@@ -540,7 +725,7 @@ export function FaceEnrollWizardPage({
                       <p className="font-semibold truncate">{e.personName || e.userId}</p>
                       <p className="text-xs text-muted-foreground">
                         {e.hasEmbedding
-                          ? `${e.samples?.length ?? e.sampleCount ?? 0} زاویه · بیومتریک فعال`
+                          ? `${e.samples?.length ?? e.sampleCount ?? 0} نمونه · بیومتریک فعال`
                           : 'بیومتریک ناقص — دوباره ثبت کنید'}
                       </p>
                     </div>

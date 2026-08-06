@@ -29,6 +29,7 @@ import {
 } from '@/lib/attendance/face-detect'
 import {
   extractFaceEmbedding,
+  extractFaceEmbeddingFromVideo,
   warmFaceEmbedder,
 } from '@/lib/attendance/face-embed.client'
 import { FaceRecognitionMethodModal } from '@/components/security/face-recognition-method-modal'
@@ -211,12 +212,17 @@ export function GateCameraPanel({
     if (crops.length === 0) return
 
     recognizingRef.current = true
-    setStatusText(`استخراج بیومتریک ${crops.length} صورت...`)
+    setStatusText(`استخراج بیومتریک ${Math.max(1, boxes.length)} صورت...`)
     try {
       const embeddings: number[][] = []
-      for (const crop of crops) {
-        const emb = await extractFaceEmbedding(crop)
-        if (emb) embeddings.push(emb)
+      // Prefer full-frame FaceNet (more reliable than tight crops)
+      const primary = await extractFaceEmbeddingFromVideo(video)
+      if (primary) embeddings.push(primary.embedding)
+      if (embeddings.length === 0) {
+        for (const crop of crops.slice(0, 2)) {
+          const emb = await extractFaceEmbedding(crop)
+          if (emb) embeddings.push(emb)
+        }
       }
       if (embeddings.length === 0) {
         setStatusText('چهره دیده شد ولی بردار بیومتریک استخراج نشد — نور/زاویه را بهتر کنید')

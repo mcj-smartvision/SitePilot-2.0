@@ -359,12 +359,23 @@ export async function enrollPerson(supabase: SupabaseClient, input: EnrollPerson
     )
   }
 
-  const { data: previous } = await supabase
+  const { data: previous, error: previousError } = await supabase
     .from('attendance_enrollments')
     .select('image_path, sample_images')
     .eq('project_id', input.projectId)
     .eq('user_id', input.userId)
     .maybeSingle()
+
+  if (previousError) {
+    const msg = previousError.message || ''
+    if (/face_embedding|sample_images|embedding_model|sample_count/i.test(msg)) {
+      throw new AttendanceError(
+        'VALIDATION',
+        'دیتابیس به‌روز نیست. در Supabase فایل‌های database/56-attendance-face-embeddings.sql و database/57-attendance-enrollment-samples.sql را اجرا کنید.'
+      )
+    }
+    throw new AttendanceError('VALIDATION', msg)
+  }
 
   const oldPaths = new Set<string>()
   if (previous?.image_path) oldPaths.add(String(previous.image_path))
@@ -413,7 +424,16 @@ export async function enrollPerson(supabase: SupabaseClient, input: EnrollPerson
     .select('*')
     .single()
 
-  if (error) throw new AttendanceError('VALIDATION', error.message)
+  if (error) {
+    const msg = error.message || ''
+    if (/face_embedding|sample_images|embedding_model|sample_count/i.test(msg)) {
+      throw new AttendanceError(
+        'VALIDATION',
+        'دیتابیس به‌روز نیست. در Supabase فایل‌های database/56-attendance-face-embeddings.sql و database/57-attendance-enrollment-samples.sql را اجرا کنید.'
+      )
+    }
+    throw new AttendanceError('VALIDATION', msg)
+  }
 
   const newPaths = new Set(storedSamples.map((s) => s.path))
   const removePaths = [...oldPaths].filter((p) => !newPaths.has(p))

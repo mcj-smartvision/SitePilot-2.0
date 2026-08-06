@@ -93,7 +93,8 @@ export function cropFaceFromVideo(
   video: HTMLVideoElement,
   box: FaceBox,
   padRatio = 0.3,
-  quality = 0.72
+  quality = 0.72,
+  maxEdge = 320
 ): string | null {
   if (!video.videoWidth) return null
   const padX = box.width * padRatio
@@ -105,11 +106,10 @@ export function cropFaceFromVideo(
   if (w < 24 || h < 24) return null
 
   const canvas = document.createElement('canvas')
-  // Cap size for faster upload + vision API
-  const target = 224
+  const target = Math.min(224, maxEdge)
   const scale = Math.min(2.5, Math.max(1, target / Math.min(w, h)))
-  canvas.width = Math.min(320, Math.round(w * scale))
-  canvas.height = Math.min(320, Math.round(h * scale))
+  canvas.width = Math.min(maxEdge, Math.round(w * scale))
+  canvas.height = Math.min(maxEdge, Math.round(h * scale))
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
   ctx.imageSmoothingEnabled = true

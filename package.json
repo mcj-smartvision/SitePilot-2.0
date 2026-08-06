@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "dev:clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\" && next dev",
-    "build": "next build",
+    "build": "node scripts/copy-face-api-models.mjs && next build",
     "start": "next start",
+    "postinstall": "node scripts/copy-face-api-models.mjs",
     "lint": "next lint",
     "backup": "node scripts/backup.mjs",
     "backup:db": "node scripts/backup.mjs",
